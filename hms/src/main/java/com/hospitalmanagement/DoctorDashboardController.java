@@ -1,4 +1,4 @@
-package com.cs320;
+package com.hospitalmanagement;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;

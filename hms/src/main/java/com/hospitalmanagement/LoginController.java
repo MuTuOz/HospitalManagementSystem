@@ -1,4 +1,4 @@
-package com.cs320;
+package com.hospitalmanagement;
 
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -75,7 +75,6 @@ public class LoginController {
         alert.setContentText("Lütfen sistem yöneticinizle iletişime geçin.");
         alert.showAndWait();
     }
-
 
     private User authenticateUser(String username, String password) {
         System.out.println("Login denemesi - Email: " + username); // Debug için
