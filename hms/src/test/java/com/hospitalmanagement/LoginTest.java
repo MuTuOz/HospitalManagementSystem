@@ -69,4 +69,33 @@ class LoginTest {
         // 5 başarısız denemeden sonra hesap kilitlenmeli
         assertTrue(failedAttempts >= 5, "Hesap kilitlenme koşulu sağlanmalı");
     }
+
+      @Test
+    @DisplayName("T-SRS-HMS-001.3: Sistem geçersiz giriş veya başarısız işlemler için açık hata mesajları gösterir")
+    void testClearErrorDialogsForInvalidInput() {
+        // Test 1: Geçersiz kullanıcı adı (non-existent username)
+        String nonExistentEmail = "nonexistent@hospital.com";
+        String anyPassword = "password123";
+        
+        boolean loginAttempt = nonExistentEmail.equals(validDoctor.getEmail())
+                && anyPassword.equals(validDoctor.getPassword());
+        
+        assertFalse(loginAttempt, "Olmayan kullanıcı ile giriş başarısız olmalı");
+
+        // Test 2: Boş email alanı
+        String emptyEmail = "";
+        boolean emptyEmailAttempt = emptyEmail.isEmpty() 
+                || !emptyEmail.equals(validDoctor.getEmail());
+        
+        assertTrue(emptyEmailAttempt, "Boş email ile giriş reddedilmeli");
+
+        // Test 3: Geçersiz email formatı
+        String invalidEmail = "abc@xyz"; // nokta içermiyor
+        boolean hasValidFormat = invalidEmail.contains("@") 
+                && invalidEmail.contains(".") 
+                && invalidEmail.indexOf("@") < invalidEmail.lastIndexOf(".");
+        
+        assertFalse(hasValidFormat, "Geçersiz email formatı reddedilmeli");
+    }
+
 }

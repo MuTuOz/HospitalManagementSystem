@@ -5,6 +5,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
 import java.sql.Connection;
@@ -34,9 +35,19 @@ public class LoginController {
 
     @FXML
     private void initialize() {
-        // Logo yükleme
-        // logoImageView.setImage(new
-        // Image(getClass().getResourceAsStream("/com/cs320/logo.jpg")));
+        // Logo yükleme - static klasöründen
+        if (logoImageView != null) {
+            try {
+                var imageStream = getClass().getResourceAsStream("/static/alplogo.png");
+                if (imageStream != null) {
+                    logoImageView.setImage(new Image(imageStream));
+                } else {
+                    System.out.println("Logo dosyası bulunamadı: /static/alplogo.png");
+                }
+            } catch (Exception e) {
+                System.out.println("Logo yüklenemedi: " + e.getMessage());
+            }
+        }
 
         // Enter tuşu ile login
         passwordField.setOnAction(e -> handleLogin());
