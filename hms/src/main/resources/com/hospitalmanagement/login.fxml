@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.cs320.LoginController">
+   <children>
+      <!-- Header with Logo and Title -->
+      <VBox alignment="CENTER" spacing="20" style="-fx-background-color: linear-gradient(to bottom, #ffffffff, #ffffffff); -fx-padding: 50;">
+         <children>
+            <!-- Logo Container -->
+            <VBox alignment="CENTER" spacing="10">
+               <children>
+                  <!-- User Avatar Icon -->
+                  <VBox alignment="CENTER" maxHeight="360.0" maxWidth="360.0" minHeight="100.0" minWidth="100.0" style="-fx-background-color: rgba(255, 255, 255, 0.2); -fx-background-radius: 50; -fx-border-color: rgba(255, 255, 255, 0.3); -fx-border-radius: 50; -fx-border-width: 2;">
+                     <children>
+                        <ImageView fx:id="logoImageView" fitHeight="200.0" fitWidth="200.0" pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@alplogo.png" />
+                           </image>
+                        </ImageView>
+                     </children>
+                  </VBox>
+               </children>
+            </VBox>
+         </children>
+      </VBox>
+
+      <!-- Login Form -->
+      <VBox alignment="CENTER" spacing="25" style="-fx-background-color: white; -fx-padding: 40 30 30 30;">
+         <children>
+            <!-- Username Field -->
+            <VBox spacing="8">
+               <children>
+                  <Label style="-fx-font-size: 14px; -fx-text-fill: #666; -fx-font-weight: normal;" text="Enter Username/ email" />
+                  <TextField fx:id="usernameField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+               </children>
+            </VBox>
+
+            <!-- Password Field -->
+            <VBox spacing="8">
+               <children>
+                  <Label style="-fx-font-size: 14px; -fx-text-fill: #4a90e2; -fx-font-weight: normal;" text="Enter password" />
+                  <PasswordField fx:id="passwordField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #4a90e2; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+               </children>
+            </VBox>
+
+            <!-- Forgot Password Link -->
+            <HBox alignment="CENTER_RIGHT">
+               <children>
+                  <Hyperlink fx:id="forgotPasswordLink" onAction="#handleForgotPassword" style="-fx-text-fill: #4a90e2; -fx-font-size: 12px;" text="forgot password ?" />
+               </children>
+            </HBox>
+
+            <!-- Error/Success Message -->
+            <Label fx:id="errorLabel" alignment="CENTER" style="-fx-font-size: 12px; -fx-text-fill: #dc3545;" visible="false" wrapText="true" />
+
+            <!-- Login Button -->
+            <Button fx:id="loginButton" maxWidth="1.7976931348623157E308" onAction="#handleLogin" prefHeight="50.0" style="-fx-background-color: #4a90e2; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;" text="🔓 LOGIN">
+               <font>
+                  <Font size="16.0" />
+               </font>
+            </Button>
+         </children>
+      </VBox>
+   </children>
+</VBox>
