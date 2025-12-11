@@ -5,7 +5,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.cs320.ManagerDashboardController">
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospitalmanagement.ManagerDashboardController">
    <top>
       <HBox alignment="CENTER_LEFT" spacing="20" style="-fx-background-color: #4a90e2; -fx-padding: 15;">
          <children>
