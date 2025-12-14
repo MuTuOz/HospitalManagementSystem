@@ -1,0 +1,11 @@
+com\hospitalmanagement\LoginController.class
+com\hospitalmanagement\SecondaryController.class
+com\hospitalmanagement\PrimaryController.class
+module-info.class
+com\hospitalmanagement\App.class
+com\hospitalmanagement\ManagerDashboardController.class
+com\hospitalmanagement\DatabaseConnection.class
+com\hospitalmanagement\User.class
+com\hospitalmanagement\PatientDashboardController.class
+com\hospitalmanagement\AdminDashboardController.class
+com\hospitalmanagement\DoctorDashboardController.class
