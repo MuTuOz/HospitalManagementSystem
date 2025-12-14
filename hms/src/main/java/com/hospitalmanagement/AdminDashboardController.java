@@ -149,8 +149,7 @@ public class AdminDashboardController {
     private void handleLogout() {
         try {
             Session.clear();
-            GUIManager guiManager = new GUIManager(App.getStage());
-            guiManager.switchToLogin();
+            App.setRoot("login");
         } catch (Exception e) {
             e.printStackTrace();
         }
