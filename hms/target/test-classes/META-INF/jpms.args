@@ -1,4 +1,0 @@
---patch-module
-com.hospitalmanagement=_
---add-reads
-com.hospitalmanagement=ALL-UNNAMED
