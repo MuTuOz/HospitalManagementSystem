@@ -17,11 +17,13 @@ INSERT INTO Role (name, description) VALUES
 -- 2. KULLANICILAR (Adminler + Managerlar + 175 Doktor + 175 Hasta = 375+ User)
 -- -----------------------------------------------------
 INSERT INTO User (name, email, password, phone, address, role_id) VALUES
--- Adminler (user_id: 1-2)
+-- Adminler (user_id: 1-3)
 ('Mehmet Yılmaz', 'mehmet.yilmaz@admin.com', '$2y$10$abcdefgh', '05324567890', 'Kadıköy/İstanbul', 1),
 ('Ayşe Demir', 'ayse.demir@admin.com', '$2y$10$bcdefghi', '05426789012', 'Çankaya/Ankara', 1),
+-- Test Admin (Plain text password for development)
+('Test Admin', 'test@admin.com', 'admin123', '05551234567', 'Test Mahallesi/İstanbul', 1),
 
--- Managerlar (user_id: 3-27, Her hastane için 1 manager)
+-- Managerlar (user_id: 4-28, Her hastane için 1 manager)
 -- İstanbul Hastaneleri Managerları
 ('Zeynep Kaya', 'zeynep.kaya@manager.com', '$2y$10$cdefghij', '05337890123', 'Kadıköy/İstanbul', 2),
 ('Ali Şahin', 'ali.sahin@manager.com', '$2y$10$defghijk', '05448901234', 'Beşiktaş/İstanbul', 2),
