@@ -34,11 +34,30 @@ public class AppointmentManager {
      * Delete/cancel an appointment
      */
     public boolean deleteAppointment(int appointmentId, int cancelledByUserId) {
+        // First check if the appointment can be cancelled
+        Appointment appointment = DatabaseQuery.getAppointmentById(appointmentId);
+        if (appointment == null) {
+            System.out.println("Appointment not found: " + appointmentId);
+            return false;
+        }
+        
+        // Prevent cancellation of completed appointments
+        if ("Completed".equals(appointment.getStatus())) {
+            System.out.println("Cannot cancel completed appointment: " + appointmentId);
+            return false;
+        }
+        
+        // Prevent cancellation of already cancelled appointments
+        if ("Cancelled".equals(appointment.getStatus())) {
+            System.out.println("Appointment already cancelled: " + appointmentId);
+            return false;
+        }
+        
         return DatabaseQuery.cancelAppointment(appointmentId, cancelledByUserId);
     }
     
     /**
-     * Reactivate a cancelled appointment
+     * Reactivate a cancelled appointment if the time slot is still available
      */
     public boolean reactivateAppointment(int appointmentId, int reactivatedByUserId) {
         return DatabaseQuery.reactivateAppointment(appointmentId, reactivatedByUserId);
