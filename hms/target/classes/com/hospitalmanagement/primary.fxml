@@ -4,11 +4,20 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Button?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.image.ImageView?>
 
-<VBox alignment="CENTER" spacing="20.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospitalmanagement.PrimaryController">
+<VBox alignment="CENTER" spacing="20.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospitalmanagement.LoginController">
    <children>
-      <Label text="Primary View" />
-      <Button fx:id="primaryButton" text="Switch to Secondary View" onAction="#switchToSecondary"/>
+      <ImageView fx:id="logoImageView" fitHeight="140.0" fitWidth="140.0" pickOnBounds="true" preserveRatio="true" />
+      <TextField fx:id="usernameField" promptText="Email Adresiniz" />
+      <PasswordField fx:id="passwordField" promptText="Şifre" />
+      <Button fx:id="loginButton" mnemonicParsing="false" onAction="#handleLogin" text="Giriş Yap" />
+      <Hyperlink fx:id="forgotPasswordLink" onAction="#handleForgotPassword" text="Şifremi Unuttum" />
+      <Hyperlink fx:id="registerLink" onAction="#handleRegister" text="Kayıt Ol" />
+      <Label fx:id="errorLabel" text="Hata Mesajı" textFill="RED" visible="false" wrapText="true" />
    </children>
    <padding>
       <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />

@@ -1,0 +1,84 @@
+/* Turquoise theme for HMS */
+root {
+    -fx-base: #e6fffb;
+}
+
+.root {
+    -fx-background-color: linear-gradient(to bottom, #e6fff9, #d9fff2);
+    -fx-font-family: "Segoe UI", "System";
+}
+
+Label {
+    -fx-text-fill: #07575B;
+}
+
+Button {
+    -fx-background-color: linear-gradient(#00b3a6, #00a08f);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+}
+
+Button:hover {
+    -fx-background-color: linear-gradient(#00d1c6, #00b3a6);
+}
+
+TextField, PasswordField, ComboBox, TextArea, ListView {
+    -fx-border-color: #8ed1c9;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+TableView {
+    -fx-border-color: #cfeeea;
+}
+
+/* Header label style */
+.label {
+    -fx-font-size: 13px;
+}
+
+/* Card container */
+.card {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-padding: 18;
+    -fx-effect: dropshadow(gaussian, rgba(3,47,43,0.08), 8, 0.2, 0, 2);
+}
+
+/* Header bar */
+.header {
+    -fx-background-color: linear-gradient(to right, #00b3a6, #00a08f);
+    -fx-padding: 12 18 12 18;
+}
+
+.logo-image {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0.2, 0, 2);
+}
+
+/* Buttons */
+.btn-primary {
+    -fx-background-color: linear-gradient(#00b3a6, #009988);
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+    -fx-background-radius: 8;
+}
+
+.btn-secondary {
+    -fx-background-color: transparent;
+    -fx-border-color: #00a08f;
+    -fx-border-radius: 6;
+    -fx-text-fill: #07575B;
+}
+
+/* Inputs */
+.input-field {
+    -fx-border-color: #cfeeea;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 8 10 8 10;
+}
+
+.list-view {
+    -fx-border-color: #e6fff9;
+}

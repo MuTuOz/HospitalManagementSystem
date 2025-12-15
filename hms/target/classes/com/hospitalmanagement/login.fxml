@@ -30,13 +30,13 @@
       </VBox>
 
       <!-- Login Form -->
-      <VBox alignment="CENTER" spacing="25" style="-fx-background-color: white; -fx-padding: 40 30 30 30;">
+      <VBox alignment="CENTER" spacing="25" styleClass="card" >
          <children>
             <!-- Username Field -->
             <VBox spacing="8">
                <children>
                   <Label style="-fx-font-size: 14px; -fx-text-fill: #666; -fx-font-weight: normal;" text="Enter Username/ email" />
-                  <TextField fx:id="usernameField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+                  <TextField fx:id="usernameField" prefHeight="45.0" styleClass="input-field" />
                </children>
             </VBox>
 
@@ -44,14 +44,14 @@
             <VBox spacing="8">
                <children>
                   <Label style="-fx-font-size: 14px; -fx-text-fill: #4a90e2; -fx-font-weight: normal;" text="Enter password" />
-                  <PasswordField fx:id="passwordField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #4a90e2; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+                  <PasswordField fx:id="passwordField" prefHeight="45.0" styleClass="input-field" />
                </children>
             </VBox>
 
             <!-- Forgot Password Link -->
             <HBox alignment="CENTER_RIGHT">
                <children>
-                  <Hyperlink fx:id="forgotPasswordLink" onAction="#handleForgotPassword" style="-fx-text-fill: #4a90e2; -fx-font-size: 12px;" text="forgot password ?" />
+                  <Hyperlink fx:id="forgotPasswordLink" onAction="#handleForgotPassword" style="-fx-text-fill: #07575B; -fx-font-size: 12px;" text="Şifremi Unuttum" />
                </children>
             </HBox>
 
@@ -59,7 +59,7 @@
             <Label fx:id="errorLabel" alignment="CENTER" style="-fx-font-size: 12px; -fx-text-fill: #dc3545;" visible="false" wrapText="true" />
 
             <!-- Login Button -->
-            <Button fx:id="loginButton" maxWidth="1.7976931348623157E308" onAction="#handleLogin" prefHeight="50.0" style="-fx-background-color: #4a90e2; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;" text="🔓 LOGIN">
+            <Button fx:id="loginButton" maxWidth="1.7976931348623157E308" onAction="#handleLogin" prefHeight="50.0" styleClass="btn-primary" text="Giriş Yap">
                <font>
                   <Font size="16.0" />
                </font>
