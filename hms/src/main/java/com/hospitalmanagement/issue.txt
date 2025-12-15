@@ -1,0 +1,3 @@
+1- Patient randevuları silemiyor,
+2- patient completed randevuları silebiliyor !!!
+3- canceled randevular alınamıyor
