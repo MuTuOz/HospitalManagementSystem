@@ -1369,6 +1369,48 @@ public class DatabaseQuery {
         return false;
     }
 
+    // Get a single appointment by ID
+    public static Appointment getAppointmentById(int appointmentId) {
+        String query = "SELECT a.*, " +
+                      "d.name AS doctor_name, " +
+                      "p.name AS patient_name, " +
+                      "av.time_slot " +
+                      "FROM Appointment a " +
+                      "LEFT JOIN Doctor d ON a.doctor_id = d.doctor_id " +
+                      "LEFT JOIN Patient p ON a.patient_id = p.patient_id " +
+                      "LEFT JOIN Availability av ON a.availability_id = av.availability_id " +
+                      "WHERE a.appointment_id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, appointmentId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                Date apptDate = rs.getDate("appointment_date");
+                return new Appointment(
+                    rs.getInt("appointment_id"),
+                    rs.getInt("doctor_id"),
+                    rs.getInt("patient_id"),
+                    rs.getInt("availability_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("status"),
+                    rs.getString("notes"),
+                    rs.getString("diagnosis"),
+                    rs.getString("prescription"),
+                    apptDate,
+                    rs.getString("time_slot"),
+                    rs.getString("doctor_name"),
+                    rs.getString("patient_name")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return null;
+    }
     // Get cancelled appointment ID for a patient by availability
     public static int getCancelledAppointmentByAvailability(int patientId, int availabilityId) {
         String query = "SELECT appointment_id FROM Appointment " +
