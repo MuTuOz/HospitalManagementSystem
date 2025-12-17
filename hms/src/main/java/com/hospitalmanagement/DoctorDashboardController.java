@@ -7,6 +7,12 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.stage.Stage;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -24,11 +30,76 @@ public class DoctorDashboardController {
     private Label doctorNameLabel;
 
     @FXML
+    private Label hospitalLabel;
+
+    @FXML
+    private TableView<Appointment> appointmentTableView;
+
+    @FXML
+    private TableView<AvailabilityOption> availabilityTableView;
+
+    @FXML
     private void initialize() {
-        welcomeLabel.setText("Doktor Dashboard");
         var user = Session.getCurrentUser();
         if (user != null) {
             doctorNameLabel.setText(user.getName());
+            
+            // Set hospital name
+            Doctor d = DatabaseQuery.getDoctorByUserId(user.getUserId());
+            if (d != null) {
+                Hospital h = DatabaseQuery.getHospitalById(d.getHospitalId());
+                if (h != null && hospitalLabel != null) {
+                    hospitalLabel.setText(h.getName());
+                }
+            }
+        }
+        
+        // Configure columns
+        if (appointmentTableView != null) {
+            ObservableList<TableColumn<Appointment, ?>> columns = appointmentTableView.getColumns();
+            if (columns.size() >= 6) {
+                columns.get(0).setCellValueFactory(new PropertyValueFactory<>("appointmentId"));
+                columns.get(1).setCellValueFactory(new PropertyValueFactory<>("doctorName"));
+                columns.get(2).setCellValueFactory(new PropertyValueFactory<>("patientName"));
+                columns.get(3).setCellValueFactory(new PropertyValueFactory<>("appointmentDate"));
+                columns.get(4).setCellValueFactory(new PropertyValueFactory<>("timeSlot"));
+                columns.get(5).setCellValueFactory(new PropertyValueFactory<>("status"));
+            }
+        }
+
+        if (availabilityTableView != null) {
+            ObservableList<TableColumn<AvailabilityOption, ?>> columns = availabilityTableView.getColumns();
+            if (columns.size() >= 3) {
+                ((TableColumn<AvailabilityOption, java.sql.Date>) columns.get(0)).setCellValueFactory(new PropertyValueFactory<>("date"));
+                ((TableColumn<AvailabilityOption, String>) columns.get(1)).setCellValueFactory(new PropertyValueFactory<>("timeSlot"));
+                ((TableColumn<AvailabilityOption, String>) columns.get(2)).setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("Müsait"));
+            }
+        }
+
+        loadAppointments();
+        loadAvailability();
+    }
+
+    @FXML
+    private void refreshAppointments() {
+        loadAppointments();
+    }
+
+    @FXML
+    private void refreshAvailability() {
+        loadAvailability();
+    }
+
+    @FXML
+    private void loadAvailability() {
+        var user = Session.getCurrentUser();
+        if (user == null) return;
+        var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
+        if (doctor == null) return;
+
+        var availabilities = DatabaseQuery.getAvailabilitiesByDoctor(doctor.getDoctorId());
+        if (availabilityTableView != null) {
+            availabilityTableView.setItems(FXCollections.observableArrayList(availabilities));
         }
     }
 
@@ -36,42 +107,16 @@ public class DoctorDashboardController {
     private void loadAppointments() {
         System.out.println("Randevular yükleniyor...");
         var user = Session.getCurrentUser();
-        if (user == null) {
-            Alert a = new Alert(Alert.AlertType.WARNING, "Oturum bulunamadı.", ButtonType.OK);
-            a.setHeaderText("Hata");
-            a.showAndWait();
-            return;
-        }
+        if (user == null) return;
 
         var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
-        if (doctor == null) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Doktor kaydı bulunamadı.", ButtonType.OK);
-            a.setHeaderText("Randevular");
-            a.showAndWait();
-            return;
-        }
+        if (doctor == null) return;
 
         var appts = appointmentManager.viewAppointmentsByDoctor(doctor.getDoctorId());
-        if (appts.isEmpty()) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Hiç randevu bulunamadı.", ButtonType.OK);
-            a.setHeaderText("Randevular");
-            a.showAndWait();
-            return;
+        
+        if (appointmentTableView != null) {
+            appointmentTableView.setItems(FXCollections.observableArrayList(appts));
         }
-
-        StringBuilder sb = new StringBuilder();
-        for (var ap : appts) {
-            sb.append(ap.getAppointmentDate()).append(" ").append(ap.getTimeSlot()).append(" - ")
-              .append(ap.getPatientName()).append(" (Durum: ").append(ap.getStatus()).append(")\n");
-        }
-        Alert a = new Alert(Alert.AlertType.INFORMATION);
-        a.setTitle("Randevular");
-        a.setHeaderText("Mevcut Randevularınız");
-        TextArea ta = new TextArea(sb.toString());
-        ta.setEditable(false);
-        ta.setWrapText(true);
-        a.getDialogPane().setContent(ta);
-        a.showAndWait();
     }
 
     @FXML
@@ -93,70 +138,97 @@ public class DoctorDashboardController {
             return;
         }
 
-        javafx.scene.control.TextInputDialog dateDialog = new javafx.scene.control.TextInputDialog();
-        dateDialog.setTitle("Uygunluk Ekle");
-        dateDialog.setHeaderText("Tarih giriniz (YYYY-MM-DD)");
-        DialogUtil.attachOkValidation(dateDialog, () -> {
-            String txt = dateDialog.getEditor().getText();
-            try {
-                java.time.LocalDate d = java.time.LocalDate.parse(txt);
-                if (d.isBefore(java.time.LocalDate.now())) {
-                    ValidationUtil.showError("Tarih geçmiş olamaz.");
-                    return false;
-                }
-                return true;
-            } catch (Exception ex) {
-                ValidationUtil.showError("Geçersiz tarih formatı. Lütfen YYYY-MM-DD şeklinde girin.");
-                return false;
-            }
-        });
-        var dateRes = dateDialog.showAndWait();
-        if (dateRes.isEmpty()) return;
-        String dateStr = dateRes.get();
+        // Custom dialog
+        javafx.scene.control.Dialog<javafx.util.Pair<java.time.LocalDate, String>> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Uygunluk Ekle");
+        dialog.setHeaderText("Yeni müsaitlik zamanı ekleyin");
 
-        javafx.scene.control.TextInputDialog timeDialog = new javafx.scene.control.TextInputDialog();
-        timeDialog.setTitle("Uygunluk Ekle");
-        timeDialog.setHeaderText("Saat aralığını giriniz (HH:MM-HH:MM)");
-        DialogUtil.attachOkValidation(timeDialog, () -> {
-            String txt = timeDialog.getEditor().getText();
-            try {
-                String[] parts = txt.split("-");
-                if (parts.length != 2) throw new IllegalArgumentException();
-                java.time.LocalTime s = java.time.LocalTime.parse(parts[0]);
-                java.time.LocalTime e = java.time.LocalTime.parse(parts[1]);
-                java.time.LocalTime workStart = java.time.LocalTime.of(8,0);
-                java.time.LocalTime workEnd = java.time.LocalTime.of(18,0);
-                if (!s.isBefore(e) || s.isBefore(workStart) || e.isAfter(workEnd)) {
-                    ValidationUtil.showError("Saat aralığı çalışma saatleri içinde ve doğru formatta olmalıdır (08:00-18:00).");
-                    return false;
-                }
-                return true;
-            } catch (Exception ex) {
-                ValidationUtil.showError("Geçersiz saat formatı. HH:MM-HH:MM şeklinde girin.");
-                return false;
-            }
-        });
-        var timeRes = timeDialog.showAndWait();
-        if (timeRes.isEmpty()) return;
-        String timeSlot = timeRes.get();
+        // Buttons
+        ButtonType addButtonType = new ButtonType("Ekle", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButtonType, ButtonType.CANCEL);
 
-        try {
-            java.time.LocalDate date = java.time.LocalDate.parse(dateStr);
-            boolean ok = DatabaseQuery.addAvailability(doctor.getDoctorId(), date, timeSlot);
-            if (ok) {
-                Alert success = new Alert(Alert.AlertType.INFORMATION, "Uygunluk başarıyla eklendi.", ButtonType.OK);
-                success.setHeaderText("Başarılı");
-                success.showAndWait();
-            } else {
-                Alert err = new Alert(Alert.AlertType.ERROR, "Uygunluk eklenemedi. Tarih/saat formatını ve çalışma saatlerini kontrol edin.", ButtonType.OK);
-                err.setHeaderText("Hata");
-                err.showAndWait();
+        // Layout
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+
+        javafx.scene.control.DatePicker datePicker = new javafx.scene.control.DatePicker();
+        datePicker.setValue(java.time.LocalDate.now().plusDays(1));
+        datePicker.setEditable(false);
+        
+        javafx.scene.control.ComboBox<String> timeCombo = new javafx.scene.control.ComboBox<>();
+        for (int hour = 8; hour < 18; hour++) {
+            for (int minute = 0; minute < 60; minute += 15) {
+                timeCombo.getItems().add(String.format("%02d:%02d", hour, minute));
             }
-        } catch (Exception ex) {
-            Alert err = new Alert(Alert.AlertType.ERROR, "Geçersiz tarih formatı.", ButtonType.OK);
-            err.setHeaderText("Hata");
-            err.showAndWait();
         }
+        timeCombo.getSelectionModel().selectFirst();
+
+        grid.add(new Label("Tarih:"), 0, 0);
+        grid.add(datePicker, 1, 0);
+        grid.add(new Label("Saat:"), 0, 1);
+        grid.add(timeCombo, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Convert result
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == addButtonType) {
+                return new javafx.util.Pair<>(datePicker.getValue(), timeCombo.getValue());
+            }
+            return null;
+        });
+
+        // Validation inside dialog
+        final javafx.scene.control.Button btOk = (javafx.scene.control.Button) dialog.getDialogPane().lookupButton(addButtonType);
+        btOk.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            java.time.LocalDate d = datePicker.getValue();
+            if (d == null) {
+                ValidationUtil.showError("Tarih seçmelisiniz.");
+                event.consume();
+                return;
+            }
+            if (d.isBefore(java.time.LocalDate.now())) {
+                ValidationUtil.showError("Geçmiş tarih seçemezsiniz.");
+                event.consume();
+                return;
+            }
+            if (d.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || d.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+                ValidationUtil.showError("Hafta sonu seçemezsiniz.");
+                event.consume();
+                return;
+            }
+        });
+
+        var result = dialog.showAndWait();
+        
+        result.ifPresent(pair -> {
+            java.time.LocalDate date = pair.getKey();
+            String startTime = pair.getValue();
+            
+            // Calculate end time (15 mins later)
+            String[] parts = startTime.split(":");
+            int h = Integer.parseInt(parts[0]);
+            int m = Integer.parseInt(parts[1]);
+            java.time.LocalTime start = java.time.LocalTime.of(h, m);
+            String timeSlot = String.format("%02d:%02d", start.getHour(), start.getMinute());
+
+            boolean added = DatabaseQuery.addAvailability(
+                doctor.getDoctorId(), 
+                date, 
+                timeSlot
+            );
+            
+            if (added) {
+                Alert a = new Alert(Alert.AlertType.INFORMATION, "Müsaitlik başarıyla eklendi.", ButtonType.OK);
+                a.showAndWait();
+                loadAvailability();
+            } else {
+                Alert a = new Alert(Alert.AlertType.ERROR, "Müsaitlik eklenemedi (zaten mevcut olabilir).", ButtonType.OK);
+                a.showAndWait();
+            }
+        });
     }
 
     @FXML
@@ -203,7 +275,7 @@ public class DoctorDashboardController {
         }
 
         // Ensure schema (adds last_edited_by and audit table if missing)
-        DatabaseQuery.ensureMedicalRecordSchema();
+        // DatabaseQuery.ensureMedicalRecordSchema(); // REMOVED: DDL mismatch
 
         // Build patient list from appointments
         var appts = appointmentManager.viewAppointmentsByDoctor(doctor.getDoctorId());
@@ -340,10 +412,149 @@ public class DoctorDashboardController {
     }
 
     @FXML
+    private void completeAppointment() {
+        var user = Session.getCurrentUser();
+        if (user == null) {
+            NotificationUtil.showError("Hata", "Oturum bulunamadı.");
+            return;
+        }
+
+        var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
+        if (doctor == null) {
+            NotificationUtil.showError("Hata", "Doktor kaydı bulunamadı.");
+            return;
+        }
+
+        // Bugünün randevularını al
+        java.time.LocalDate today = java.time.LocalDate.now();
+        var allAppointments = appointmentManager.viewAppointmentsByDoctor(doctor.getDoctorId());
+        
+        // Bugün olanları ve "scheduled" durumundakileri filtrele
+        var todayScheduledAppointments = allAppointments.stream()
+            .filter(a -> "scheduled".equalsIgnoreCase(a.getStatus()))
+            .filter(a -> {
+                try {
+                    java.time.LocalDate appointmentDate = a.getAppointmentDate().toLocalDate();
+                    return !appointmentDate.isAfter(today);
+                } catch (Exception e) {
+                    return false;
+                }
+            })
+            .collect(java.util.stream.Collectors.toList());
+        
+        if (todayScheduledAppointments.isEmpty()) {
+            NotificationUtil.showInfo("Bilgi", "Bugün veya daha önceki tarihlerde tamamlanmamış randevu bulunamadı.");
+            return;
+        }
+
+        // Randevu seçimi için ChoiceDialog
+        var appointmentOptions = todayScheduledAppointments.stream()
+            .map(a -> "Randevu #" + a.getAppointmentId() + " - " + a.getPatientName() + " (" + 
+                     a.getAppointmentDate() + " " + a.getTimeSlot() + ")")
+            .collect(java.util.stream.Collectors.toList());
+        
+        var dialog = new javafx.scene.control.ChoiceDialog<>(appointmentOptions.get(0), appointmentOptions);
+        dialog.setTitle("Randevu Tamamla");
+        dialog.setHeaderText("Tamamlanacak randevuyu seçin");
+        dialog.setContentText("Randevu:");
+        
+        var result = dialog.showAndWait();
+        result.ifPresent(selectedOption -> {
+            // Seçilen randevunun ID'sini çıkar
+            int selectedIndex = appointmentOptions.indexOf(selectedOption);
+            var selectedAppointment = todayScheduledAppointments.get(selectedIndex);
+            
+            // Detayları al
+            javafx.scene.control.Dialog<Boolean> detailsDialog = new javafx.scene.control.Dialog<>();
+            detailsDialog.setTitle("Randevu Detayları");
+            detailsDialog.setHeaderText("Randevu sonuçlarını girin");
+            
+            javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new javafx.geometry.Insets(20));
+            
+            javafx.scene.control.TextArea diagnosisArea = new javafx.scene.control.TextArea();
+            diagnosisArea.setPromptText("Tanı...");
+            diagnosisArea.setPrefRowCount(3);
+            
+            javafx.scene.control.TextArea prescriptionArea = new javafx.scene.control.TextArea();
+            prescriptionArea.setPromptText("Reçete...");
+            prescriptionArea.setPrefRowCount(3);
+            
+            javafx.scene.control.TextArea notesArea = new javafx.scene.control.TextArea();
+            notesArea.setPromptText("Notlar...");
+            notesArea.setPrefRowCount(3);
+
+            javafx.scene.control.TextArea testResultsArea = new javafx.scene.control.TextArea();
+            testResultsArea.setPromptText("Test Sonuçları...");
+            testResultsArea.setPrefRowCount(3);
+            
+            grid.add(new javafx.scene.control.Label("Tanı:"), 0, 0);
+            grid.add(diagnosisArea, 1, 0);
+            grid.add(new javafx.scene.control.Label("Reçete:"), 0, 1);
+            grid.add(prescriptionArea, 1, 1);
+            grid.add(new javafx.scene.control.Label("Notlar:"), 0, 2);
+            grid.add(notesArea, 1, 2);
+            grid.add(new javafx.scene.control.Label("Test Sonuçları:"), 0, 3);
+            grid.add(testResultsArea, 1, 3);
+            
+            detailsDialog.getDialogPane().setContent(grid);
+            detailsDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            detailsDialog.setResultConverter(bt -> bt == ButtonType.OK);
+            
+            var detailsResult = detailsDialog.showAndWait();
+            if (detailsResult.isPresent() && detailsResult.get()) {
+                String diagnosis = diagnosisArea.getText();
+                String prescription = prescriptionArea.getText();
+                String notes = notesArea.getText();
+                String testResults = testResultsArea.getText();
+                
+                boolean detailsUpdated = DatabaseQuery.updateAppointmentDetails(
+                    selectedAppointment.getAppointmentId(), 
+                    diagnosis, 
+                    prescription, 
+                    notes
+                );
+                
+                if (detailsUpdated) {
+                    boolean statusUpdated = DatabaseQuery.updateAppointmentStatus(selectedAppointment.getAppointmentId(), "completed");
+                    if (statusUpdated) {
+                        // Create Medical Record automatically
+                        String medicalNotes = "Tanı: " + diagnosis + "\n" + notes;
+                        boolean recordCreated = DatabaseQuery.createMedicalRecord(
+                            selectedAppointment.getPatientId(),
+                            doctor.getDoctorId(),
+                            selectedAppointment.getAppointmentId(),
+                            selectedAppointment.getHospitalId(),
+                            testResults, // test_results
+                            prescription, // medications
+                            medicalNotes // notes
+                        );
+
+                        if (recordCreated) {
+                            NotificationUtil.showInfo("Başarılı", "Randevu tamamlandı ve tıbbi kayıt oluşturuldu.");
+                        } else {
+                            NotificationUtil.showInfo("Uyarı", "Randevu tamamlandı fakat tıbbi kayıt oluşturulamadı.");
+                        }
+                        
+                        loadAppointments(); // Listeyi yenile
+                    } else {
+                        NotificationUtil.showError("Hata", "Randevu durumu güncellenemedi.");
+                    }
+                } else {
+                    NotificationUtil.showError("Hata", "Randevu detayları kaydedilemedi.");
+                }
+            }
+        });
+    }
+
+    @FXML
     private void handleLogout() {
         try {
             Session.clear();
-            GUIManager guiManager = new GUIManager(App.getStage());
+            Stage currentStage = (Stage) doctorNameLabel.getScene().getWindow();
+            GUIManager guiManager = new GUIManager(currentStage);
             guiManager.switchToLogin();
         } catch (Exception e) {
             e.printStackTrace();
@@ -377,6 +588,12 @@ public class DoctorDashboardController {
         grid.add(tfNewPassword, 1, 1);
         grid.add(new javafx.scene.control.Label("Yeni Şifre Tekrar:"), 0, 2);
         grid.add(tfConfirm, 1, 2);
+
+        javafx.scene.control.Label lblInfo = new javafx.scene.control.Label("Şifre en az 8 karakter, büyük harf, küçük harf ve sayı içermelidir.");
+        lblInfo.setWrapText(true);
+        lblInfo.setMaxWidth(300);
+        lblInfo.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
+        grid.add(lblInfo, 0, 3, 2, 1);
         
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
@@ -408,6 +625,196 @@ public class DoctorDashboardController {
                 NotificationUtil.showInfo("Başarı", "Şifre başarıyla değiştirildi.");
             } else {
                 NotificationUtil.showError("Hata", "Eski şifre yanlış veya şifre değiştirilemedi.");
+            }
+        }
+    }
+
+    // SRS-HMS-004: View reviews and ratings
+    @FXML
+    private void handleViewReviews() {
+        var user = Session.getCurrentUser();
+        if (user == null) {
+            NotificationUtil.showError("Hata", "Oturum bulunamadı.");
+            return;
+        }
+        
+        var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
+        if (doctor == null) {
+            NotificationUtil.showError("Hata", "Doktor kaydı bulunamadı.");
+            return;
+        }
+        
+        // Get reviews for this doctor
+        var reviews = DatabaseQuery.getReviewsByDoctor(doctor.getDoctorId());
+        double avgRating = DatabaseQuery.getAverageRatingForDoctor(doctor.getDoctorId());
+        
+        if (reviews.isEmpty()) {
+            NotificationUtil.showInfo("Bilgi", "Henüz değerlendirme bulunmamaktadır.");
+            return;
+        }
+        
+        // Display reviews
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Ortalama Puan: %.2f / 5.0 (%d değerlendirme)\n", avgRating, reviews.size()));
+        sb.append("=".repeat(50)).append("\n\n");
+        
+        for (var review : reviews) {
+            sb.append("Tarih: ").append(review.getReviewDate()).append("\n");
+            sb.append("Hasta: ").append(review.getPatientName()).append("\n");
+            sb.append("Puan: ").append("★".repeat(review.getRating()))
+              .append("☆".repeat(5 - review.getRating()))
+              .append(" (").append(review.getRating()).append("/5)\n");
+            sb.append("Yorum: ").append(review.getComment()).append("\n");
+            sb.append("-".repeat(50)).append("\n\n");
+        }
+        
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Hasta Değerlendirmeleri");
+        alert.setHeaderText("Sizin hakkınızdaki değerlendirmeler");
+        
+        TextArea ta = new TextArea(sb.toString());
+        ta.setEditable(false);
+        ta.setWrapText(true);
+        ta.setPrefRowCount(15);
+        
+        alert.getDialogPane().setContent(ta);
+        alert.showAndWait();
+    }
+
+    /**
+     * Create a new medical record for a patient
+     * SRS-HMS-007: Doctors create medical records for patients they have treated
+     */
+    @FXML
+    private void handleCreateMedicalRecord() {
+        var user = Session.getCurrentUser();
+        if (user == null) {
+            NotificationUtil.showError("Hata", "Oturum bulunamadı.");
+            return;
+        }
+
+        var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
+        if (doctor == null) {
+            NotificationUtil.showError("Hata", "Doktor kaydı bulunamadı.");
+            return;
+        }
+
+        // Get completed appointments
+        var appts = appointmentManager.viewAppointmentsByDoctor(doctor.getDoctorId());
+        java.util.List<Appointment> completedAppts = new java.util.ArrayList<>();
+        for (var ap : appts) {
+            if ("completed".equalsIgnoreCase(ap.getStatus())) {
+                completedAppts.add(ap);
+            }
+        }
+        
+        if (completedAppts.isEmpty()) {
+            NotificationUtil.showInfo("Bilgi", "Henüz tamamlanmış randevunuz bulunmamaktadır.");
+            return;
+        }
+
+        // Select appointment
+        java.util.List<String> items = new java.util.ArrayList<>();
+        for (var ap : completedAppts) {
+            items.add(ap.getAppointmentId() + " - " + ap.getAppointmentDate() + " " + ap.getTimeSlot() + " - " + ap.getPatientName());
+        }
+        
+        javafx.scene.control.ChoiceDialog<String> apptDialog = 
+            new javafx.scene.control.ChoiceDialog<>(items.get(0), items);
+        apptDialog.setTitle("Randevu Seç");
+        apptDialog.setHeaderText("Tıbbi kayıt oluşturmak istediğiniz randevuyu seçin");
+        var apptRes = apptDialog.showAndWait();
+        if (apptRes.isEmpty()) return;
+        
+        int appointmentId = Integer.parseInt(apptRes.get().split(" - ")[0].trim());
+        Appointment selectedAppt = completedAppts.stream().filter(a -> a.getAppointmentId() == appointmentId).findFirst().orElse(null);
+        if (selectedAppt == null) return;
+
+        // Create medical record dialog
+        javafx.scene.control.Dialog<Boolean> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Yeni Tıbbi Kayıt");
+        dialog.setHeaderText("Hasta için tıbbi kayıt oluşturun");
+        
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+        
+        javafx.scene.control.TextArea diagnosisArea = new javafx.scene.control.TextArea();
+        diagnosisArea.setPromptText("Tanı bilgisi...");
+        diagnosisArea.setPrefRowCount(2);
+        diagnosisArea.setWrapText(true);
+        
+        javafx.scene.control.TextArea testArea = new javafx.scene.control.TextArea();
+        testArea.setPromptText("Test sonuçları...");
+        testArea.setPrefRowCount(3);
+        testArea.setWrapText(true);
+        
+        javafx.scene.control.TextArea medArea = new javafx.scene.control.TextArea();
+        medArea.setPromptText("Reçete edilen ilaçlar...");
+        medArea.setPrefRowCount(3);
+        medArea.setWrapText(true);
+        
+        javafx.scene.control.TextArea notesArea = new javafx.scene.control.TextArea();
+        notesArea.setPromptText("Doktor notları...");
+        notesArea.setPrefRowCount(3);
+        notesArea.setWrapText(true);
+        
+        grid.add(new javafx.scene.control.Label("Tanı:"), 0, 0);
+        grid.add(diagnosisArea, 1, 0);
+        grid.add(new javafx.scene.control.Label("Test Sonuçları:"), 0, 1);
+        grid.add(testArea, 1, 1);
+        grid.add(new javafx.scene.control.Label("İlaçlar:"), 0, 2);
+        grid.add(medArea, 1, 2);
+        grid.add(new javafx.scene.control.Label("Notlar:"), 0, 3);
+        grid.add(notesArea, 1, 3);
+        
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.setResultConverter(bt -> bt == ButtonType.OK);
+        
+        DialogUtil.attachOkValidation(dialog, () -> {
+            if (testArea.getText().trim().isEmpty()) {
+                ValidationUtil.showError("Doğrulama", "Test sonuçları boş olamaz.");
+                return false;
+            }
+            if (medArea.getText().trim().isEmpty()) {
+                ValidationUtil.showError("Doğrulama", "İlaç bilgisi boş olamaz.");
+                return false;
+            }
+            if (notesArea.getText().trim().isEmpty()) {
+                ValidationUtil.showError("Doğrulama", "Notlar boş olamaz.");
+                return false;
+            }
+            return true;
+        });
+        
+        var result = dialog.showAndWait();
+        if (result.isPresent() && result.get()) {
+            String diagnosis = diagnosisArea.getText().trim();
+            String testResults = testArea.getText().trim();
+            String medications = medArea.getText().trim();
+            String notes = notesArea.getText().trim();
+            
+            // Update appointment with diagnosis and prescription
+            DatabaseQuery.updateAppointmentDetails(appointmentId, diagnosis, medications, notes);
+
+            // Create medical record
+            int recordId = hospitalManager.createMedicalRecord(
+                selectedAppt.getPatientId(), 
+                doctor.getDoctorId(), 
+                appointmentId,
+                doctor.getHospitalId(),
+                diagnosis,
+                testResults,
+                medications,
+                notes
+            );
+            
+            if (recordId > 0) {
+                NotificationUtil.showInfo("Başarı", "Tıbbi kayıt başarıyla oluşturuldu.");
+            } else {
+                NotificationUtil.showError("Hata", "Tıbbi kayıt oluşturulamadı.");
             }
         }
     }
