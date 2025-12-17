@@ -7,6 +7,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.Stage;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
@@ -25,7 +26,7 @@ public class PatientDashboardController {
     private final HospitalManager hospitalManager = new HospitalManager();
     
     @FXML
-    private Label welcomeLabel;
+    private Label patientNameLabel;
     @FXML
     private Label lblName;
     @FXML
@@ -49,10 +50,13 @@ public class PatientDashboardController {
             System.out.println("Randevu güncelleme hatası: " + e.getMessage());
         }
 
-        welcomeLabel.setText("Hasta Dashboard'a Hoş Geldiniz!");
         setupAppointmentTableColumns();
         var user = Session.getCurrentUser();
         if (user != null) {
+            // Sadece ismi göster
+            if (patientNameLabel != null) {
+                patientNameLabel.setText(user.getName());
+            }
             var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
             if (patient != null) {
                 lblName.setText(patient.getName());
@@ -69,6 +73,7 @@ public class PatientDashboardController {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void setupAppointmentTableColumns() {
         if (appointmentsTable != null && appointmentsTable.getColumns().size() >= 5) {
             ((TableColumn<Appointment, Integer>) appointmentsTable.getColumns().get(0)).setCellValueFactory(new PropertyValueFactory<>("appointmentId"));
@@ -80,20 +85,36 @@ public class PatientDashboardController {
     }
 
     @FXML
-    private void refreshAppointments() {
+    public void refreshAppointments() {
+        System.out.println("refreshAppointments çağrıldı");
         var user = Session.getCurrentUser();
-        if (user == null) return;
+        if (user == null) {
+            System.out.println("User null!");
+            return;
+        }
+        System.out.println("User: " + user.getName());
         var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
-        if (patient == null) return;
+        if (patient == null) {
+            System.out.println("Patient null!");
+            return;
+        }
+        System.out.println("Patient ID: " + patient.getPatientId());
         List<Appointment> appts = appointmentManager.viewAppointmentsByPatient(patient.getPatientId());
-        if (appointmentsTable != null) appointmentsTable.setItems(FXCollections.observableArrayList(appts));
+        System.out.println("Bulunan randevu sayısı: " + appts.size());
+        if (appointmentsTable != null) {
+            appointmentsTable.setItems(FXCollections.observableArrayList(appts));
+            System.out.println("Tablo güncellendi");
+        } else {
+            System.out.println("appointmentsTable null!");
+        }
     }
 
     @FXML
     private void handleLogout() {
         try {
             Session.clear();
-            GUIManager guiManager = new GUIManager(App.getStage());
+            Stage currentStage = (Stage) appointmentsTable.getScene().getWindow();
+            GUIManager guiManager = new GUIManager(currentStage);
             guiManager.switchToLogin();
         } catch (Exception e) {
             e.printStackTrace();
@@ -103,8 +124,12 @@ public class PatientDashboardController {
     @FXML
     private void handleCreateAppointment() {
         try {
-            FXMLLoader loader = new FXMLLoader(App.class.getResource("create_appointment.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("create_appointment.fxml"));
             Scene scene = new Scene(loader.load());
+            
+            // Controller'ı root'a userData olarak ekle
+            scene.getRoot().setUserData(this);
+            
             Stage stage = new Stage();
             stage.setTitle("Randevu Oluştur");
             stage.initOwner(App.getStage());
@@ -116,7 +141,7 @@ public class PatientDashboardController {
             refreshAppointments();
         } catch (Exception e) {
             e.printStackTrace();
-            NotificationUtil.showError("Hata", "Randevu oluşturma ekranı açılamadı.");
+            NotificationUtil.showError("Hata", "Randevu oluşturma ekranı açılamadı: " + e.getMessage());
         }
     }
 
@@ -173,15 +198,15 @@ public class PatientDashboardController {
         System.out.println("Appointment ID: " + selected.getAppointmentId());
         System.out.println("Status: " + selected.getStatus());
         
-        if ("Cancelled".equals(selected.getStatus())) {
-            System.out.println("Randevu zaten iptal edilmiş!");
-            NotificationUtil.showInfo("İptal", "Bu randevu zaten iptal edilmiş.");
+        if ("completed".equalsIgnoreCase(selected.getStatus())) {
+            System.out.println("Tamamlanmış randevu iptal edilemez!");
+            NotificationUtil.showWarning("İptal Edilemez", "Tamamlanmış randevular iptal edilemez.");
             return;
         }
         
-        if ("Completed".equals(selected.getStatus())) {
-            System.out.println("Tamamlanmış randevu iptal edilemez!");
-            NotificationUtil.showWarning("İptal Edilemez", "Tamamlanmış randevular iptal edilemez.");
+        if ("cancelled".equalsIgnoreCase(selected.getStatus())) {
+            System.out.println("Zaten iptal edilmiş randevu tekrar iptal edilemez!");
+            NotificationUtil.showWarning("İptal Edilemez", "Bu randevu zaten iptal edilmiş.");
             return;
         }
         
@@ -224,7 +249,7 @@ public class PatientDashboardController {
         System.out.println("Appointment ID: " + selected.getAppointmentId());
         System.out.println("Status: " + selected.getStatus());
         
-        if (!"Cancelled".equals(selected.getStatus())) {
+        if (!"cancelled".equalsIgnoreCase(selected.getStatus())) {
             System.out.println("Sadece iptal edilmiş randevular tekrar aktifleştirilebilir!");
             NotificationUtil.showWarning("Geçersiz İşlem", "Sadece iptal edilmiş randevular tekrar aktifleştirilebilir.");
             return;
@@ -378,6 +403,12 @@ public class PatientDashboardController {
         grid.add(tfNewPassword, 1, 1);
         grid.add(new javafx.scene.control.Label("Yeni Şifre Tekrar:"), 0, 2);
         grid.add(tfConfirm, 1, 2);
+
+        javafx.scene.control.Label lblInfo = new javafx.scene.control.Label("Şifre en az 8 karakter, büyük harf, küçük harf ve sayı içermelidir.");
+        lblInfo.setWrapText(true);
+        lblInfo.setMaxWidth(300);
+        lblInfo.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
+        grid.add(lblInfo, 0, 3, 2, 1);
         
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
@@ -409,6 +440,194 @@ public class PatientDashboardController {
                 NotificationUtil.showInfo("Başarı", "Şifre başarıyla değiştirildi.");
             } else {
                 NotificationUtil.showError("Hata", "Eski şifre yanlış veya şifre değiştirilemedi.");
+            }
+        }
+    }
+
+    // SRS-HMS-004: Rate and review doctors after completed appointments
+    @FXML
+    private void handleRateDoctor() {
+        var user = Session.getCurrentUser();
+        if (user == null) {
+            NotificationUtil.showError("Hata", "Oturum bulunamadı.");
+            return;
+        }
+        
+        var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
+        if (patient == null) {
+            NotificationUtil.showError("Hata", "Hasta kaydı bulunamadı.");
+            return;
+        }
+        
+        // Get completed appointments without review
+        var completedAppts = DatabaseQuery.getCompletedAppointmentsWithoutReview(patient.getPatientId());
+        
+        if (completedAppts.isEmpty()) {
+            NotificationUtil.showInfo("Bilgi", "Değerlendirilecek tamamlanmış randevunuz bulunmamaktadır.");
+            return;
+        }
+        
+        // Create selection dialog
+        javafx.scene.control.ChoiceDialog<Appointment> choiceDialog = 
+            new javafx.scene.control.ChoiceDialog<>(completedAppts.get(0), completedAppts);
+        choiceDialog.setTitle("Doktor Değerlendirme");
+        choiceDialog.setHeaderText("Değerlendirmek istediğiniz randevuyu seçin");
+        choiceDialog.setContentText("Randevu:");
+        
+        var choiceResult = choiceDialog.showAndWait();
+        if (!choiceResult.isPresent()) return;
+        
+        Appointment selectedAppt = choiceResult.get();
+        
+        // Create review dialog
+        javafx.scene.control.Dialog<Void> reviewDialog = new javafx.scene.control.Dialog<>();
+        reviewDialog.setTitle("Doktor Değerlendirmesi");
+        reviewDialog.setHeaderText("Dr. " + selectedAppt.getDoctorName() + " için değerlendirme");
+        
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+        
+        // Rating slider (1-5)
+        javafx.scene.control.Label ratingLabel = new javafx.scene.control.Label("Puan (1-5):");
+        javafx.scene.control.Slider ratingSlider = new javafx.scene.control.Slider(1, 5, 5);
+        ratingSlider.setShowTickLabels(true);
+        ratingSlider.setShowTickMarks(true);
+        ratingSlider.setMajorTickUnit(1);
+        ratingSlider.setMinorTickCount(0);
+        ratingSlider.setSnapToTicks(true);
+        javafx.scene.control.Label ratingValue = new javafx.scene.control.Label("5");
+        ratingSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            ratingValue.setText(String.valueOf(newVal.intValue()));
+        });
+        
+        // Comment text area
+        javafx.scene.control.Label commentLabel = new javafx.scene.control.Label("Yorum:");
+        javafx.scene.control.TextArea commentArea = new javafx.scene.control.TextArea();
+        commentArea.setPrefRowCount(4);
+        commentArea.setWrapText(true);
+        commentArea.setPromptText("Deneyiminizi paylaşın...");
+        
+        // Anonymous checkbox
+        javafx.scene.control.CheckBox anonymousCheck = new javafx.scene.control.CheckBox("Anonim değerlendirme");
+        
+        grid.add(ratingLabel, 0, 0);
+        grid.add(ratingSlider, 1, 0);
+        grid.add(ratingValue, 2, 0);
+        grid.add(commentLabel, 0, 1);
+        grid.add(commentArea, 1, 1, 2, 1);
+        grid.add(anonymousCheck, 1, 2);
+        
+        reviewDialog.getDialogPane().setContent(grid);
+        reviewDialog.getDialogPane().getButtonTypes().addAll(
+            javafx.scene.control.ButtonType.OK, 
+            javafx.scene.control.ButtonType.CANCEL
+        );
+        
+        DialogUtil.attachOkValidation(reviewDialog, () -> {
+            if (commentArea.getText().trim().isEmpty()) {
+                ValidationUtil.showError("Doğrulama", "Lütfen yorum yazınız.");
+                return false;
+            }
+            return true;
+        });
+        
+        var result = reviewDialog.showAndWait();
+        if (result.isPresent()) {
+            int rating = (int) ratingSlider.getValue();
+            String comment = commentArea.getText().trim();
+            boolean isAnonymous = anonymousCheck.isSelected();
+            
+            boolean success = DatabaseQuery.createReview(
+                patient.getPatientId(),
+                selectedAppt.getDoctorId(),
+                selectedAppt.getAppointmentId(),
+                selectedAppt.getHospitalId(),
+                rating,
+                comment,
+                isAnonymous
+            );
+            
+            if (success) {
+                NotificationUtil.showInfo("Başarı", "Değerlendirmeniz kaydedildi. Teşekkürler!");
+            } else {
+                NotificationUtil.showError("Hata", "Değerlendirme kaydedilemedi.");
+            }
+        }
+    }
+
+    @FXML
+    private void handleReviewDoctor() {
+        var selected = appointmentsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            NotificationUtil.showWarning("Seçim", "Lütfen değerlendirmek istediğiniz randevuyu seçin.");
+            return;
+        }
+
+        if (!"completed".equalsIgnoreCase(selected.getStatus())) {
+            NotificationUtil.showWarning("Uyarı", "Sadece tamamlanmış randevuları değerlendirebilirsiniz.");
+            return;
+        }
+
+        var user = Session.getCurrentUser();
+        if (user == null) return;
+        var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
+        if (patient == null) return;
+
+        // Check if already reviewed
+        if (DatabaseQuery.hasReviewedAppointment(patient.getPatientId(), selected.getAppointmentId())) {
+            NotificationUtil.showInfo("Bilgi", "Bu randevu için zaten değerlendirme yaptınız.");
+            return;
+        }
+
+        // Show review dialog
+        javafx.scene.control.Dialog<Boolean> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Doktor Değerlendirme");
+        dialog.setHeaderText("Dr. " + selected.getDoctorName() + " için değerlendirmeniz");
+
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+
+        javafx.scene.control.ComboBox<Integer> ratingCombo = new javafx.scene.control.ComboBox<>();
+        ratingCombo.getItems().addAll(1, 2, 3, 4, 5);
+        ratingCombo.setValue(5);
+
+        javafx.scene.control.TextArea commentArea = new javafx.scene.control.TextArea();
+        commentArea.setPromptText("Yorumunuz...");
+        commentArea.setPrefRowCount(3);
+        commentArea.setWrapText(true);
+
+        javafx.scene.control.CheckBox anonymousCheck = new javafx.scene.control.CheckBox("İsimsiz gönder");
+
+        grid.add(new javafx.scene.control.Label("Puan:"), 0, 0);
+        grid.add(ratingCombo, 1, 0);
+        grid.add(new javafx.scene.control.Label("Yorum:"), 0, 1);
+        grid.add(commentArea, 1, 1);
+        grid.add(anonymousCheck, 1, 2);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.setResultConverter(bt -> bt == ButtonType.OK);
+
+        var result = dialog.showAndWait();
+        if (result.isPresent() && result.get()) {
+            boolean success = DatabaseQuery.createReview(
+                patient.getPatientId(),
+                selected.getDoctorId(),
+                selected.getAppointmentId(),
+                selected.getHospitalId(),
+                ratingCombo.getValue(),
+                commentArea.getText(),
+                anonymousCheck.isSelected()
+            );
+
+            if (success) {
+                NotificationUtil.showInfo("Başarılı", "Değerlendirmeniz kaydedildi. Teşekkürler!");
+            } else {
+                NotificationUtil.showError("Hata", "Değerlendirme kaydedilemedi.");
             }
         }
     }
