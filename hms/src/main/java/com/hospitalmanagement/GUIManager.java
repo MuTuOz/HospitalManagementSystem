@@ -79,10 +79,19 @@ public class GUIManager {
         FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlName + ".fxml"));
         Parent root = loader.load();
         
-        scene = new Scene(root);
-        stage.setScene(scene);
-        stage.setTitle(title);
-        stage.setMaximized(true);
+        // Set minimum scene size for login/primary screen
+        if ("primary".equals(fxmlName) || "login".equals(fxmlName)) {
+            scene = new Scene(root, 900, 600);
+            stage.setScene(scene);
+            stage.setTitle(title);
+            stage.setResizable(false);
+        } else {
+            scene = new Scene(root);
+            stage.setScene(scene);
+            stage.setTitle(title);
+            stage.setMaximized(true);
+        }
+        
         stage.show();
     }
 
