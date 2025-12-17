@@ -1,40 +1,59 @@
 package com.hospitalmanagement;
 
 import com.hospitalmanagement.service.AppointmentManager;
-import com.hospitalmanagement.service.HospitalManager;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
-import java.util.List;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class CreateAppointmentController {
     
-    // Service layer instances
     private final AppointmentManager appointmentManager = new AppointmentManager();
-    private final HospitalManager hospitalManager = new HospitalManager();
 
     @FXML private ComboBox<String> cityCombo;
     @FXML private ComboBox<String> hospitalCombo;
     @FXML private ComboBox<String> specialtyCombo;
     @FXML private ComboBox<String> doctorCombo;
-    @FXML private ListView<String> availabilityList;
-    @FXML private Button filterButton;
+    @FXML private HBox dateTabsContainer;
+    @FXML private ScrollPane dateScrollPane;
+    @FXML private Button prevDateButton;
+    @FXML private Button nextDateButton;
+    @FXML private Accordion timeSlotsAccordion;
+    @FXML private Label selectedDateLabel;
+    @FXML private Label selectedDoctorLabel;
+    @FXML private Label hospitalInfoLabel;
     @FXML private Button createButton;
     @FXML private Button closeButton;
     @FXML private TextArea notesArea;
 
     private int selectedHospitalId = -1;
     private int selectedDoctorId = -1;
+    private LocalDate selectedDate = null;
+    private AvailabilityOption selectedSlot = null;
+
+    private final Map<Integer, AvailabilityOption> availabilityById = new HashMap<>();
+    private List<AvailabilityOption> currentAvailabilities = new ArrayList<>();
+    
+    private Button lastSelectedDateButton = null;
+    private Button lastSelectedSlotButton = null;
 
     @FXML
     private void initialize() {
         List<String> cities = DatabaseQuery.getAllCities();
         cityCombo.setItems(FXCollections.observableArrayList(cities));
+        
+        // Hastane için varsayılan "Farketmez" seçeneği
+        hospitalCombo.setPromptText("Farketmez (Tüm Hastaneler)");
+        
         List<String> specs = DatabaseQuery.getAllSpecialtyNames();
         specialtyCombo.setItems(FXCollections.observableArrayList(specs));
 
@@ -42,145 +61,375 @@ public class CreateAppointmentController {
         hospitalCombo.setOnAction(e -> onHospitalChanged());
         specialtyCombo.setOnAction(e -> onSpecialtyChanged());
         doctorCombo.setOnAction(e -> onDoctorChanged());
-
-        filterButton.setOnAction(e -> onFilter());
-        createButton.setOnAction(e -> onCreate());
-        closeButton.setOnAction(e -> ((Stage)closeButton.getScene().getWindow()).close());
+        createButton.setDisable(true);
     }
 
     private void onCityChanged() {
         String city = cityCombo.getValue();
-        if (city == null) return;
-        var hospitals = DatabaseQuery.getHospitalsByCity(city);
-        hospitalCombo.getItems().clear();
-        for (var h : hospitals) hospitalCombo.getItems().add(h.getName() + " - id:" + h.getHospitalId());
+        if (city == null || city.isEmpty()) return;
+        
+        List<Hospital> hospitals = DatabaseQuery.getHospitalsByCity(city);
+        List<String> names = hospitals.stream().map(Hospital::getName).collect(Collectors.toList());
+        
+        // "Farketmez" seçeneğini listenin başına ekle
+        names.add(0, "Farketmez (Tüm Hastaneler)");
+        
+        hospitalCombo.setItems(FXCollections.observableArrayList(names));
+        hospitalCombo.setValue("Farketmez (Tüm Hastaneler)");
+        doctorCombo.setValue(null);
+        clearAvailabilities();
     }
 
     private void onHospitalChanged() {
-        String sel = hospitalCombo.getValue();
-        if (sel == null) return;
-        try { selectedHospitalId = Integer.parseInt(sel.replaceAll(".*id:", "")); } catch (Exception ex) { selectedHospitalId = -1; }
+        String hospitalName = hospitalCombo.getValue();
+        if (hospitalName == null || hospitalName.isEmpty() || hospitalName.equals("Farketmez (Tüm Hastaneler)")) {
+            // Hastane seçilmediyse veya "Farketmez" seçiliyse varsayılanı -1 yap
+            selectedHospitalId = -1;
+            hospitalInfoLabel.setText("Tüm Hastaneler");
+            loadDoctorsForCurrentFilters();
+            return;
+        }
+        
+        Hospital h = DatabaseQuery.getHospitalByName(hospitalName);
+        if (h != null) {
+            selectedHospitalId = h.getHospitalId();
+            hospitalInfoLabel.setText(hospitalName);
+            loadDoctorsForCurrentFilters();
+        }
     }
 
     private void onSpecialtyChanged() {
-        // load doctors for specialty if hospital selected
-        if (selectedHospitalId <= 0) return;
-        String spec = specialtyCombo.getValue();
-        if (spec == null) return;
-        Integer specId = DatabaseQuery.getSpecialtyIdByName(spec);
-        doctorCombo.getItems().clear();
-        if (specId == null) return;
-        var doctors = DatabaseQuery.getDoctorsBySpecialtyAndHospital(specId, selectedHospitalId);
-        for (var d : doctors) doctorCombo.getItems().add(d.getName() + " - id:" + d.getDoctorId());
+        loadDoctorsForCurrentFilters();
+    }
+
+    private void loadDoctorsForCurrentFilters() {
+        String specialty = specialtyCombo.getValue();
+        if (specialty == null || specialty.isEmpty()) return;
+        
+        System.out.println("loadDoctorsForCurrentFilters çağrıldı - specialty: " + specialty + ", hospitalId: " + selectedHospitalId);
+        
+        List<Doctor> doctors;
+        if (selectedHospitalId == -1) {
+            // Hastane seçilmemişse - şehir bazlı filtreleme yap
+            String city = cityCombo.getValue();
+            if (city != null && !city.isEmpty()) {
+                // Şehirdeki tüm hastaneleri al
+                List<Hospital> hospitalsInCity = DatabaseQuery.getHospitalsByCity(city);
+                doctors = new ArrayList<>();
+                for (Hospital hospital : hospitalsInCity) {
+                    List<Doctor> hospitalDoctors = DatabaseQuery.getDoctorsByHospitalAndSpecialty(hospital.getHospitalId(), specialty);
+                    for (Doctor d : hospitalDoctors) {
+                        // Duplicate kontrolü
+                        if (doctors.stream().noneMatch(existing -> existing.getDoctorId() == d.getDoctorId())) {
+                            doctors.add(d);
+                        }
+                    }
+                }
+            } else {
+                // Şehir de seçilmemişse tüm doktorları göster
+                doctors = DatabaseQuery.getAllDoctors().stream()
+                    .filter(d -> d.getSpecialtyName().equals(specialty))
+                    .collect(Collectors.toList());
+            }
+        } else {
+            doctors = DatabaseQuery.getDoctorsByHospitalAndSpecialty(selectedHospitalId, specialty);
+        }
+        
+        System.out.println("Toplam bulunan doktor sayısı: " + doctors.size());
+        
+        // Sadece müsaitliği olan doktorları göster
+        List<Doctor> doctorsWithAvailability = doctors.stream()
+            .filter(d -> {
+                List<AvailabilityOption> slots;
+                if (selectedHospitalId == -1) {
+                    slots = DatabaseQuery.getAllAvailableSlotsForDoctor(d.getDoctorId());
+                } else {
+                    slots = DatabaseQuery.getAvailableSlots(d.getDoctorId(), selectedHospitalId);
+                }
+                boolean hasSlots = !slots.isEmpty();
+                System.out.println("  Doktor: " + d.getName() + " - Müsaitlik var mı: " + hasSlots + " (slot sayısı: " + slots.size() + ")");
+                return hasSlots;
+            })
+            .collect(Collectors.toList());
+        
+        System.out.println("Müsaitliği olan doktor sayısı: " + doctorsWithAvailability.size());
+        
+        List<String> names = doctorsWithAvailability.stream().map(Doctor::getName).collect(Collectors.toList());
+        doctorCombo.setItems(FXCollections.observableArrayList(names));
+        doctorCombo.setValue(null);
+        clearAvailabilities();
     }
 
     private void onDoctorChanged() {
-        String sel = doctorCombo.getValue();
-        if (sel == null) return;
-        try { selectedDoctorId = Integer.parseInt(sel.replaceAll(".*id:", "")); } catch (Exception ex) { selectedDoctorId = -1; }
-        loadAvailabilities();
-    }
-
-    private void onFilter() {
-        loadAvailabilities();
+        String doctorName = doctorCombo.getValue();
+        if (doctorName == null || doctorName.isEmpty()) {
+            clearAvailabilities();
+            return;
+        }
+        
+        Doctor doc = DatabaseQuery.getDoctorByName(doctorName);
+        if (doc != null) {
+            selectedDoctorId = doc.getDoctorId();
+            selectedDoctorLabel.setText("Doktor: " + doctorName);
+            loadAvailabilities();
+        }
     }
 
     private void loadAvailabilities() {
-        availabilityList.getItems().clear();
-        System.out.println("=== AVAILABILITY YÜKLEME ===");
+        if (selectedDoctorId == -1) return;
+        
+        List<AvailabilityOption> availabilities;
+        if (selectedHospitalId == -1) {
+            // Hastane seçilmemişse tüm hastanelerdeki slotları getir
+            System.out.println("Hastane seçilmedi, tüm hastaneler aranacak. Doctor ID: " + selectedDoctorId);
+            availabilities = DatabaseQuery.getAllAvailableSlotsForDoctor(selectedDoctorId);
+            System.out.println("Bulunan availability sayısı: " + availabilities.size());
+        } else {
+            System.out.println("Hastane seçildi. Hospital ID: " + selectedHospitalId + ", Doctor ID: " + selectedDoctorId);
+            availabilities = DatabaseQuery.getAvailableSlots(selectedDoctorId, selectedHospitalId);
+            System.out.println("Bulunan availability sayısı: " + availabilities.size());
+        }
+        
+        // Limit to next 30 days (1 month)
+        LocalDate maxDate = LocalDate.now().plusDays(30);
+        availabilities = availabilities.stream()
+            .filter(a -> !a.getDate().toLocalDate().isAfter(maxDate))
+            .collect(Collectors.toList());
+        
+        currentAvailabilities = availabilities;
+        
+        if (availabilities.isEmpty()) {
+            NotificationUtil.showInfo("Bilgi", "Bu doktor için uygun randevu bulunmamaktadır.");
+            clearAvailabilities();
+            return;
+        }
+        
+        // Group by date
+        Map<Date, List<AvailabilityOption>> dateMap = availabilities.stream()
+            .collect(Collectors.groupingBy(AvailabilityOption::getDate, TreeMap::new, Collectors.toList()));
+        
+        // Create date tabs
+        dateTabsContainer.getChildren().clear();
+        dateTabsContainer.setSpacing(10);
+        dateTabsContainer.setAlignment(Pos.CENTER_LEFT);
+        
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", new Locale("tr"));
+        
+        for (Date sqlDate : dateMap.keySet()) {
+            LocalDate date = sqlDate.toLocalDate();
+            Button dateTab = new Button(date.format(dateFormatter));
+            dateTab.getStyleClass().add("date-tab");
+            dateTab.setPrefHeight(40);
+            dateTab.setOnAction(e -> selectDate(date, dateTab));
+            dateTabsContainer.getChildren().add(dateTab);
+        }
+        
+        // Select first date by default
+        if (!dateMap.isEmpty()) {
+            LocalDate firstDate = dateMap.keySet().iterator().next().toLocalDate();
+            Button firstButton = (Button) dateTabsContainer.getChildren().get(0);
+            selectDate(firstDate, firstButton);
+        }
+    }
+
+    private void selectDate(LocalDate date, Button clickedButton) {
+        this.selectedDate = date;
+        this.selectedSlot = null;
+        
+        // Update button styles
+        if (lastSelectedDateButton != null) {
+            lastSelectedDateButton.getStyleClass().remove("date-tab-selected");
+        }
+        clickedButton.getStyleClass().add("date-tab-selected");
+        lastSelectedDateButton = clickedButton;
+        
+        // Filter availabilities for this date
+        Date sqlDate = Date.valueOf(date);
+        List<AvailabilityOption> dateSlots = currentAvailabilities.stream()
+            .filter(a -> a.getDate().equals(sqlDate))
+            .collect(Collectors.toList());
+        
+        // Group by hour
+        Map<Integer, List<AvailabilityOption>> hourlySlots = dateSlots.stream()
+            .collect(Collectors.groupingBy(
+                a -> {
+                    String time = a.getTimeSlot();
+                    String[] parts = time.split(":");
+                    return Integer.parseInt(parts[0]);
+                },
+                TreeMap::new,
+                Collectors.toList()
+            ));
+        
+        // Create accordion panels
+        timeSlotsAccordion.getPanes().clear();
+        
+        for (Map.Entry<Integer, List<AvailabilityOption>> entry : hourlySlots.entrySet()) {
+            int hour = entry.getKey();
+            List<AvailabilityOption> slots = entry.getValue();
+            
+            TitledPane pane = new TitledPane();
+            pane.setText(String.format("%02d:00", hour));
+            pane.getStyleClass().add("time-hour-pane");
+            
+            FlowPane flowPane = new FlowPane();
+            flowPane.setHgap(10);
+            flowPane.setVgap(10);
+            flowPane.setPadding(new Insets(15));
+            flowPane.setAlignment(Pos.CENTER_LEFT);
+            
+            for (AvailabilityOption slot : slots) {
+                Button slotBtn = new Button(slot.getTimeSlot());
+                slotBtn.getStyleClass().add("time-slot-button");
+                slotBtn.setPrefWidth(80);
+                slotBtn.setPrefHeight(35);
+                slotBtn.setOnAction(e -> selectSlot(slot, slotBtn));
+                flowPane.getChildren().add(slotBtn);
+            }
+            
+            pane.setContent(flowPane);
+            timeSlotsAccordion.getPanes().add(pane);
+        }
+        
+        // Expand first pane by default
+        if (!timeSlotsAccordion.getPanes().isEmpty()) {
+            timeSlotsAccordion.setExpandedPane(timeSlotsAccordion.getPanes().get(0));
+        }
+        
+        // Clear selection display
+        selectedDateLabel.setText("Tarih ve saat seçiniz");
+        createButton.setDisable(true);
+    }
+
+    private void selectSlot(AvailabilityOption slot, Button clickedButton) {
+        System.out.println("=== SLOT SEÇİLDİ ===");
+        System.out.println("Slot: " + slot);
+        System.out.println("Availability ID: " + slot.getAvailabilityId());
+        System.out.println("Time: " + slot.getTimeSlot());
+        
+        this.selectedSlot = slot;
+        
+        // Update button styles
+        if (lastSelectedSlotButton != null) {
+            lastSelectedSlotButton.getStyleClass().remove("time-slot-selected");
+        }
+        clickedButton.getStyleClass().add("time-slot-selected");
+        lastSelectedSlotButton = clickedButton;
+        
+        // Update selection display
+        String displayText = slot.getDate().toLocalDate().format(
+            DateTimeFormatter.ofPattern("dd.MM.yyyy - EEEE", new Locale("tr"))
+        ) + " - " + slot.getTimeSlot();
+        
+        selectedDateLabel.setText(displayText);
+        createButton.setDisable(false);
+        
+        System.out.println("Buton aktif edildi, displayText: " + displayText);
+    }
+
+    private void clearAvailabilities() {
+        dateTabsContainer.getChildren().clear();
+        timeSlotsAccordion.getPanes().clear();
+        selectedDateLabel.setText("Tarih ve saat seçiniz");
+        selectedDoctorLabel.setText("Doktor: -");
+        hospitalInfoLabel.setText("Hastane: -");
+        selectedDate = null;
+        selectedSlot = null;
+        lastSelectedDateButton = null;
+        lastSelectedSlotButton = null;
+        createButton.setDisable(true);
+        currentAvailabilities.clear();
+    }
+
+    @FXML
+    private void handleCreate() {
+        System.out.println("=== RANDEVU OLUŞTUR BASILDI ===");
+        System.out.println("selectedSlot: " + selectedSlot);
         System.out.println("selectedDoctorId: " + selectedDoctorId);
         System.out.println("selectedHospitalId: " + selectedHospitalId);
         
-        if (selectedDoctorId <= 0 || selectedHospitalId <= 0) {
-            System.out.println("Doctor veya Hospital seçilmemiş!");
+        if (selectedSlot == null) {
+            System.out.println("HATA: Slot seçilmemiş!");
+            NotificationUtil.showError("Hata", "Lütfen bir tarih ve saat seçiniz.");
             return;
         }
-        
-        var avails = DatabaseQuery.getAvailabilitiesByDoctor(selectedDoctorId);
-        System.out.println("Toplam " + avails.size() + " availability bulundu");
-        
-        int count = 0;
-        for (var ao : avails) {
-            System.out.println("Availability: ID=" + ao.getAvailabilityId() + 
-                             ", HospitalID=" + ao.getHospitalId() + 
-                             ", Date=" + ao.getDate() + 
-                             ", Time=" + ao.getTimeSlot());
-            if (ao.getHospitalId() == selectedHospitalId) {
-                availabilityList.getItems().add(ao.toString());
-                count++;
-            }
+
+        User currentUser = Session.getCurrentUser();
+        if (currentUser == null) {
+            NotificationUtil.showError("Hata", "Oturum bilgisi bulunamadı.");
+            return;
         }
-        System.out.println("Listeye " + count + " availability eklendi");
+
+        Patient patient = DatabaseQuery.getPatientByUserId(currentUser.getUserId());
+        if (patient == null) {
+            NotificationUtil.showError("Hata", "Hasta bilgisi bulunamadı.");
+            return;
+        }
+
+        String notes = notesArea.getText();
+        
+        // Eğer hastane seçilmemişse, slot'un hastane ID'sini kullan
+        int hospitalIdToUse = selectedHospitalId != -1 ? selectedHospitalId : selectedSlot.getHospitalId();
+        
+        System.out.println("Randevu oluşturma parametreleri:");
+        System.out.println("  Patient ID: " + patient.getPatientId());
+        System.out.println("  Doctor ID: " + selectedDoctorId);
+        System.out.println("  Availability ID: " + selectedSlot.getAvailabilityId());
+        System.out.println("  Hospital ID: " + hospitalIdToUse);
+        System.out.println("  Notes: " + notes);
+        
+        boolean success = appointmentManager.createAppointment(
+            patient.getPatientId(),
+            selectedDoctorId, 
+            selectedSlot.getAvailabilityId(), 
+            hospitalIdToUse, 
+            notes
+        );
+
+        System.out.println("Randevu oluşturma sonucu: " + success);
+
+        if (success) {
+            NotificationUtil.showInfo("Başarılı", "Randevunuz başarıyla oluşturuldu.");            
+            // Parent dashboard'ı yenile (PatientDashboard ise)
+            try {
+                Stage stage = (Stage) createButton.getScene().getWindow();
+                Object userData = stage.getScene().getRoot().getUserData();
+                if (userData instanceof PatientDashboardController) {
+                    PatientDashboardController pdc = (PatientDashboardController) userData;
+                    pdc.refreshAppointments();
+                }
+            } catch (Exception e) {
+                System.err.println("Dashboard yenileme hatası: " + e.getMessage());
+            }
+                        closeDialog();
+        } else {
+            NotificationUtil.showError("Hata", "Randevu oluşturulurken bir hata oluştu.");
+        }
     }
 
-    private void onCreate() {
-        System.out.println("=== RANDEVU OLUŞTURMA ===");
-        String sel = availabilityList.getSelectionModel().getSelectedItem();
-        System.out.println("Seçili availability: " + sel);
-        
-        if (sel == null) {
-            NotificationUtil.showWarning("Seçim", "Lütfen bir uygunluk seçin.");
-            return;
-        }
-        int availabilityId = -1;
-        try { 
-            availabilityId = Integer.parseInt(sel.split(" - ")[0].trim()); 
-            System.out.println("Availability ID: " + availabilityId);
-        } catch (Exception ex) { 
-            System.out.println("Availability ID parse hatası: " + ex.getMessage());
-        }
-        
-        if (availabilityId <= 0) {
-            NotificationUtil.showError("Hata", "Seçili uygunluk geçersiz.");
-            return;
-        }
-        
-        var user = Session.getCurrentUser();
-        if (user == null) { 
-            System.out.println("Session user null!");
-            NotificationUtil.showError("Hata", "Oturum bulunamadı."); 
-            return; 
-        }
-        
-        System.out.println("User ID: " + user.getUserId());
-        var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
-        
-        if (patient == null) { 
-            System.out.println("Patient kaydı bulunamadı! UserID: " + user.getUserId());
-            NotificationUtil.showError("Hata", "Hasta kaydı bulunamadı."); 
-            return; 
-        }
-        
-        System.out.println("Patient ID: " + patient.getPatientId());
-        System.out.println("Doctor ID: " + selectedDoctorId);
-        System.out.println("Hospital ID: " + selectedHospitalId);
+    @FXML
+    private void handleClose() {
+        closeDialog();
+    }
 
-        // First check if patient has a cancelled appointment for this availability
-        int cancelledAppointmentId = DatabaseQuery.getCancelledAppointmentByAvailability(
-            patient.getPatientId(), availabilityId);
-        
-        boolean ok = false;
-        if (cancelledAppointmentId > 0) {
-            // Reactivate the cancelled appointment instead of creating new one
-            System.out.println("İptal edilmiş randevu bulundu, tekrar aktifleştiriliyor: " + cancelledAppointmentId);
-            ok = appointmentManager.reactivateAppointment(cancelledAppointmentId, user.getUserId());
-            if (ok) {
-                NotificationUtil.showInfo("Randevu", "İptal ettiğiniz randevunuz tekrar aktifleştirildi.");
-            }
-        } else {
-            // Create new appointment
-            ok = appointmentManager.createAppointment(patient.getPatientId(), selectedDoctorId, availabilityId, selectedHospitalId, notesArea.getText());
-            if (ok) {
-                NotificationUtil.showInfo("Randevu", "Randevunuz oluşturuldu.");
-            }
+    @FXML
+    private void scrollDatesPrevious() {
+        if (dateScrollPane != null) {
+            double currentHValue = dateScrollPane.getHvalue();
+            dateScrollPane.setHvalue(Math.max(0, currentHValue - 0.2));
         }
-        
-        System.out.println("Randevu oluşturma/aktifleştirme sonucu: " + ok);
-        
-        if (ok) {
-            ((Stage)createButton.getScene().getWindow()).close();
-        } else {
-            NotificationUtil.showError("Randevu Hatası", "Randevu oluşturulamadı. Lütfen tekrar deneyin.");
+    }
+
+    @FXML
+    private void scrollDatesNext() {
+        if (dateScrollPane != null) {
+            double currentHValue = dateScrollPane.getHvalue();
+            dateScrollPane.setHvalue(Math.min(1, currentHValue + 0.2));
         }
+    }
+
+    private void closeDialog() {
+        Stage stage = (Stage) closeButton.getScene().getWindow();
+        stage.close();
     }
 }

@@ -179,12 +179,50 @@ public class DatabaseQuery {
         return null;
     }
 
+    public static int getHospitalIdByManagerUserId(int userId) {
+        String query = "SELECT hospital_id FROM Manager WHERE user_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("hospital_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    public static Hospital getHospitalById(int hospitalId) {
+        String query = "SELECT * FROM Hospital WHERE hospital_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, hospitalId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new Hospital(
+                    rs.getInt("hospital_id"),
+                    rs.getString("name"),
+                    rs.getString("address"),
+                    rs.getString("phone"),
+                    rs.getString("city")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     // Doktorun uygunluklarını getir
     public static java.util.List<AvailabilityOption> getAvailabilitiesByDoctor(int doctorId) {
         java.util.List<AvailabilityOption> list = new java.util.ArrayList<>();
-        String q = "SELECT av.availability_id, d.hospital_id, av.date, av.time_slot, h.name as hospital_name " +
+        String q = "SELECT av.availability_id, d.doctor_id, d.hospital_id, av.date, av.time_slot, " +
+                   "h.name as hospital_name, u.name as doctor_name " +
                    "FROM Availability av " +
                    "JOIN Doctor d ON av.doctor_id = d.doctor_id " +
+                   "JOIN User u ON d.user_id = u.user_id " +
                    "LEFT JOIN Hospital h ON d.hospital_id = h.hospital_id " +
                    "WHERE av.doctor_id = ? AND av.date >= CURDATE() AND av.is_booked = FALSE " +
                    "ORDER BY av.date, av.time_slot";
@@ -195,10 +233,12 @@ public class DatabaseQuery {
             while (rs.next()) {
                 AvailabilityOption ao = new AvailabilityOption(
                     rs.getInt("availability_id"),
+                    rs.getInt("doctor_id"),
                     rs.getInt("hospital_id"),
                     rs.getDate("date"),
                     rs.getString("time_slot"),
-                    rs.getString("hospital_name")
+                    rs.getString("hospital_name"),
+                    rs.getString("doctor_name")
                 );
                 list.add(ao);
             }
@@ -216,8 +256,10 @@ public class DatabaseQuery {
                       "JOIN Availability av ON a.availability_id = av.availability_id " +
                       "JOIN Doctor d ON a.doctor_id = d.doctor_id " +
                       "JOIN User u1 ON d.user_id = u1.user_id " +
-                      "JOIN User u2 ON a.patient_id = u2.user_id " +
-                      "WHERE a.doctor_id = ? ORDER BY av.date, av.time_slot";
+                      "JOIN Patient p ON a.patient_id = p.patient_id " +
+                      "JOIN User u2 ON p.user_id = u2.user_id " +
+                      "WHERE a.doctor_id = ? AND a.status IN ('scheduled', 'completed') " +
+                      "ORDER BY av.date, av.time_slot";
         
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -291,8 +333,9 @@ public class DatabaseQuery {
     }
 
     // Bir availability id'sinin zaten dolu (booked) olup olmadığını kontrol et
+    // Sadece completed ve scheduled randevuları dolu sayar, cancelled olanları sayar
     public static boolean isAvailabilityBooked(int availabilityId) {
-        String query = "SELECT COUNT(*) as cnt FROM Appointment WHERE availability_id = ? AND status <> 'Cancelled'";
+        String query = "SELECT COUNT(*) as cnt FROM Appointment WHERE availability_id = ? AND LOWER(status) IN ('scheduled', 'completed')";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setInt(1, availabilityId);
@@ -310,6 +353,55 @@ public class DatabaseQuery {
     public static boolean createAppointment(int doctorId, int patientId, int availabilityId, int hospitalId, String notes) {
         if (isAvailabilityBooked(availabilityId)) return false;
 
+        // Check if there is a cancelled appointment for this availability
+        String checkCancelled = "SELECT appointment_id FROM Appointment WHERE availability_id = ? AND status = 'cancelled'";
+        int existingAppointmentId = -1;
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(checkCancelled)) {
+            stmt.setInt(1, availabilityId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                existingAppointmentId = rs.getInt("appointment_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        if (existingAppointmentId != -1) {
+            // Update existing cancelled appointment
+            String update = "UPDATE Appointment SET patient_id = ?, status = 'scheduled', notes = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?";
+            String updateAvailability = "UPDATE Availability SET is_booked = TRUE WHERE availability_id = ?";
+            
+            try (Connection conn = DatabaseConnection.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(update);
+                 PreparedStatement updateStmt = conn.prepareStatement(updateAvailability)) {
+                
+                stmt.setInt(1, patientId);
+                stmt.setString(2, notes == null ? "" : notes);
+                stmt.setInt(3, existingAppointmentId);
+                
+                int rows = stmt.executeUpdate();
+                
+                if (rows > 0) {
+                    updateStmt.setInt(1, availabilityId);
+                    updateStmt.executeUpdate();
+                    
+                    // Log activity
+                    try {
+                        logUserActivity(patientId, "AppointmentCreated", "DoctorId=" + doctorId + ", AvailabilityId=" + availabilityId + " (Reused ApptId=" + existingAppointmentId + ")");
+                    } catch (Exception ignored) {}
+                    try {
+                        logUserActivity(doctorId, "AppointmentBookedForDoctor", "PatientId=" + patientId + ", AvailabilityId=" + availabilityId);
+                    } catch (Exception ignored) {}
+                }
+                return rows > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
         String insert = "INSERT INTO Appointment (doctor_id, patient_id, availability_id, hospital_id, status, notes) VALUES (?,?,?,?,?,?)";
         String updateAvailability = "UPDATE Availability SET is_booked = TRUE WHERE availability_id = ?";
         
@@ -320,7 +412,7 @@ public class DatabaseQuery {
             stmt.setInt(2, patientId);
             stmt.setInt(3, availabilityId);
             stmt.setInt(4, hospitalId);
-            stmt.setString(5, "Scheduled");
+            stmt.setString(5, "scheduled");
             stmt.setString(6, notes == null ? "" : notes);
             int rows = stmt.executeUpdate();
             
@@ -364,15 +456,25 @@ public class DatabaseQuery {
         // Hafta sonu kontrolü (Cumartesi=P, Pazar)
         DayOfWeek dow = date.getDayOfWeek();
         if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) return false;
-        // timeSlot format: HH:mm-HH:mm
+        
+        // timeSlot format: HH:mm-HH:mm veya HH:mm
+        LocalTime startTime;
         try {
-            String[] parts = timeSlot.split("-");
-            LocalTime start = LocalTime.parse(parts[0]);
-            LocalTime end = LocalTime.parse(parts[1]);
-            // Hastane çalışma saatleri 08:00 - 18:00
-            LocalTime workStart = LocalTime.of(8,0);
-            LocalTime workEnd = LocalTime.of(18,0);
-            if (start.isBefore(workStart) || end.isAfter(workEnd) || !start.isBefore(end)) return false;
+            if (timeSlot.contains("-")) {
+                String[] parts = timeSlot.split("-");
+                startTime = LocalTime.parse(parts[0]);
+                LocalTime endTime = LocalTime.parse(parts[1]);
+                // Hastane çalışma saatleri 08:00 - 18:00
+                LocalTime workStart = LocalTime.of(8,0);
+                LocalTime workEnd = LocalTime.of(18,0);
+                if (startTime.isBefore(workStart) || endTime.isAfter(workEnd) || !startTime.isBefore(endTime)) return false;
+            } else {
+                startTime = LocalTime.parse(timeSlot);
+                // Hastane çalışma saatleri 08:00 - 18:00
+                LocalTime workStart = LocalTime.of(8,0);
+                LocalTime workEnd = LocalTime.of(18,0);
+                if (startTime.isBefore(workStart) || startTime.isAfter(workEnd.minusMinutes(15))) return false;
+            }
         } catch (Exception e) {
             return false;
         }
@@ -382,7 +484,7 @@ public class DatabaseQuery {
              PreparedStatement stmt = conn.prepareStatement(insert)) {
             stmt.setInt(1, doctorId);
             stmt.setDate(2, java.sql.Date.valueOf(date));
-            stmt.setString(3, timeSlot);
+            stmt.setTime(3, java.sql.Time.valueOf(startTime));
             int rows = stmt.executeUpdate();
             return rows > 0;
         } catch (SQLException e) {
@@ -457,6 +559,66 @@ public class DatabaseQuery {
         return false;
     }
 
+    // Create user and return the generated user_id
+    public static int createUserAndReturnId(String name, String email, String hashedPassword, String tcNo, String phone, String address, int roleId) {
+        // Basit benzersiz eposta kontrolü
+        String check = "SELECT COUNT(*) as cnt FROM User WHERE email = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement chk = conn.prepareStatement(check)) {
+            chk.setString(1, email);
+            ResultSet rs = chk.executeQuery();
+            if (rs.next() && rs.getInt("cnt") > 0) return -1;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return -1;
+        }
+
+        String insert = "INSERT INTO User (name, email, password, tc_no, phone, address, role_id) VALUES (?,?,?,?,?,?,?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(insert, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, name);
+            stmt.setString(2, email);
+            stmt.setString(3, hashedPassword);
+            stmt.setString(4, tcNo);
+            stmt.setString(5, phone);
+            stmt.setString(6, address);
+            stmt.setInt(7, roleId);
+            int rows = stmt.executeUpdate();
+            if (rows > 0) {
+                ResultSet keys = stmt.getGeneratedKeys();
+                if (keys.next()) {
+                    return keys.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            // If tc_no column is missing, try without it
+            if (e.getMessage().contains("Unknown column 'tc_no'")) {
+                String insertNoTc = "INSERT INTO User (name, email, password, phone, address, role_id) VALUES (?,?,?,?,?,?)";
+                try (Connection conn = DatabaseConnection.getConnection();
+                     PreparedStatement stmt = conn.prepareStatement(insertNoTc, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                    stmt.setString(1, name);
+                    stmt.setString(2, email);
+                    stmt.setString(3, hashedPassword);
+                    stmt.setString(4, phone);
+                    stmt.setString(5, address);
+                    stmt.setInt(6, roleId);
+                    int rows = stmt.executeUpdate();
+                    if (rows > 0) {
+                        ResultSet keys = stmt.getGeneratedKeys();
+                        if (keys.next()) {
+                            return keys.getInt(1);
+                        }
+                    }
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            } else {
+                e.printStackTrace();
+            }
+        }
+        return -1;
+    }
+
     // Update user profile (name, phone, address, roleId)
     public static boolean updateUser(int userId, String name, String phone, String address, Integer roleId) {
         String upd = "UPDATE User SET name = ?, phone = ?, address = ?, role_id = ? WHERE user_id = ?";
@@ -516,6 +678,25 @@ public class DatabaseQuery {
             stmt.setInt(2, userId);
             int r = stmt.executeUpdate();
             return r > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public static boolean updateDoctor(int doctorId, int specialtyId, int hospitalId, String licenseNo, int experience, String education, double consultationFee) {
+        String query = "UPDATE Doctor SET specialty_id = ?, hospital_id = ?, license_no = ?, experience = ?, education = ?, consultation_fee = ? WHERE doctor_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, specialtyId);
+            stmt.setInt(2, hospitalId);
+            stmt.setString(3, licenseNo);
+            stmt.setInt(4, experience);
+            stmt.setString(5, education);
+            stmt.setDouble(6, consultationFee);
+            stmt.setInt(7, doctorId);
+            int rows = stmt.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -692,14 +873,18 @@ public class DatabaseQuery {
     }
 
     // Create doctor (requires user_id and specialty_id)
-    public static boolean createDoctor(int userId, int specialtyId, int clinicId, int hospitalId, 
+    public static boolean createDoctor(int userId, int specialtyId, Integer clinicId, int hospitalId, 
                                         String licenseNo, int experience, String education, double consultationFee) {
         String ins = "INSERT INTO Doctor (user_id, specialty_id, clinic_id, hospital_id, license_no, experience, education, consultation_fee) VALUES (?,?,?,?,?,?,?,?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(ins)) {
             stmt.setInt(1, userId);
             stmt.setInt(2, specialtyId);
-            stmt.setInt(3, clinicId);
+            if (clinicId != null) {
+                stmt.setInt(3, clinicId);
+            } else {
+                stmt.setNull(3, java.sql.Types.INTEGER);
+            }
             stmt.setInt(4, hospitalId);
             stmt.setString(5, licenseNo);
             stmt.setInt(6, experience);
@@ -900,32 +1085,9 @@ public class DatabaseQuery {
     }
 
     // Ensure medical record schema additions exist (last_edited_by, audit table)
+    // REMOVED: The DDL does not support these columns/tables.
     public static void ensureMedicalRecordSchema() {
-        String addCol = "ALTER TABLE Medical_Record ADD COLUMN IF NOT EXISTS last_edited_by INT NULL";
-        String createAudit = "CREATE TABLE IF NOT EXISTS Medical_Record_Audit (" +
-                "audit_id INT PRIMARY KEY AUTO_INCREMENT, " +
-                "record_id INT NOT NULL, " +
-                "edited_by INT, " +
-                "edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "old_test_results TEXT, " +
-                "old_medications TEXT, " +
-                "old_notes TEXT, " +
-                "FOREIGN KEY (record_id) REFERENCES Medical_Record(record_id) ON DELETE CASCADE" +
-                ")";
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement()) {
-            try {
-                stmt.execute(addCol);
-            } catch (SQLException ignored) {
-                // Some MySQL versions don't support IF NOT EXISTS for ADD COLUMN; ignore failures
-            }
-            try {
-                stmt.execute(createAudit);
-            } catch (SQLException ignored) {
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        // No-op to respect the provided DDL
     }
 
     // Get medical records for a patient
@@ -1038,6 +1200,35 @@ public class DatabaseQuery {
         return hospitals;
     }
 
+    // Get doctors by hospital
+    public static List<Doctor> getDoctorsByHospital(int hospitalId) {
+        List<Doctor> doctors = new ArrayList<>();
+        String q = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.hospital_id = ? ORDER BY u.name";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(q)) {
+            stmt.setInt(1, hospitalId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                doctors.add(new Doctor(
+                    rs.getInt("doctor_id"),
+                    rs.getInt("user_id"),
+                    rs.getInt("specialty_id"),
+                    rs.getInt("clinic_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("license_no"),
+                    rs.getInt("experience"),
+                    rs.getString("education"),
+                    rs.getDouble("consultation_fee"),
+                    rs.getString("name"),
+                    rs.getString("specialty_name")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return doctors;
+    }
+
     // Get doctors by specialty and hospital
     public static List<Doctor> getDoctorsBySpecialtyAndHospital(int specialtyId, int hospitalId) {
         List<Doctor> doctors = new ArrayList<>();
@@ -1083,40 +1274,19 @@ public class DatabaseQuery {
         return false;
     }
 
-    // Update a medical record with audit logging
+    // Update a medical record
     public static boolean updateMedicalRecord(int recordId, int editingDoctorId, String testResults, String medications, String notes) {
-        // Read old values
-        String sel = "SELECT test_results, medications, notes FROM Medical_Record WHERE record_id = ?";
-        String insertAudit = "INSERT INTO Medical_Record_Audit (record_id, edited_by, old_test_results, old_medications, old_notes) VALUES (?,?,?,?,?)";
-        String upd = "UPDATE Medical_Record SET test_results = ?, medications = ?, notes = ?, last_edited_by = ? WHERE record_id = ?";
+        // Removed audit logging and last_edited_by to match DDL
+        String upd = "UPDATE Medical_Record SET test_results = ?, medications = ?, notes = ? WHERE record_id = ?";
+        
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement selStmt = conn.prepareStatement(sel);
-             PreparedStatement auditStmt = conn.prepareStatement(insertAudit);
-             PreparedStatement updStmt = conn.prepareStatement(upd)) {
-            conn.setAutoCommit(false);
-            selStmt.setInt(1, recordId);
-            ResultSet rs = selStmt.executeQuery();
-            String oldTest = null, oldMed = null, oldNotes = null;
-            if (rs.next()) {
-                oldTest = rs.getString("test_results");
-                oldMed = rs.getString("medications");
-                oldNotes = rs.getString("notes");
-            }
-            auditStmt.setInt(1, recordId);
-            auditStmt.setInt(2, editingDoctorId);
-            auditStmt.setString(3, oldTest);
-            auditStmt.setString(4, oldMed);
-            auditStmt.setString(5, oldNotes);
-            auditStmt.executeUpdate();
-
-            updStmt.setString(1, testResults);
-            updStmt.setString(2, medications);
-            updStmt.setString(3, notes);
-            updStmt.setInt(4, editingDoctorId);
-            updStmt.setInt(5, recordId);
-            int rows = updStmt.executeUpdate();
-            conn.commit();
-            conn.setAutoCommit(true);
+             PreparedStatement stmt = conn.prepareStatement(upd)) {
+            stmt.setString(1, testResults);
+            stmt.setString(2, medications);
+            stmt.setString(3, notes);
+            stmt.setInt(4, recordId);
+            
+            int rows = stmt.executeUpdate();
             return rows > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1125,18 +1295,22 @@ public class DatabaseQuery {
     }
 
     // Create a new medical record
-    public static boolean createMedicalRecord(int patientId, int doctorId, int appointmentId, int hospitalId, String testResults, String medications, String notes) {
-        String insert = "INSERT INTO Medical_Record (patient_id, doctor_id, appointment_id, hospital_id, record_date, test_results, medications, notes, last_edited_by) VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)";
+    public static boolean createMedicalRecord(int patientId, int doctorId, Integer appointmentId, int hospitalId, String testResults, String medications, String notes) {
+        String insert = "INSERT INTO Medical_Record (patient_id, doctor_id, appointment_id, hospital_id, record_date, test_results, medications, notes) VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(insert)) {
             stmt.setInt(1, patientId);
             stmt.setInt(2, doctorId);
-            stmt.setInt(3, appointmentId);
+            if (appointmentId != null) {
+                stmt.setInt(3, appointmentId);
+            } else {
+                stmt.setNull(3, java.sql.Types.INTEGER);
+            }
             stmt.setInt(4, hospitalId);
             stmt.setString(5, testResults);
             stmt.setString(6, medications);
             stmt.setString(7, notes);
-            stmt.setInt(8, doctorId); // last_edited_by is the creating doctor
+            // last_edited_by removed
             int rows = stmt.executeUpdate();
             return rows > 0;
         } catch (SQLException e) {
@@ -1195,12 +1369,59 @@ public class DatabaseQuery {
         return appointments;
     }
 
+    // Get a single appointment by ID
+    public static Appointment getAppointmentById(int appointmentId) {
+        String query = "SELECT a.*, " +
+                      "u_doctor.name AS doctor_name, " +
+                      "u_patient.name AS patient_name, " +
+                      "av.time_slot, " +
+                      "av.date AS appointment_date " +
+                      "FROM Appointment a " +
+                      "LEFT JOIN Doctor d ON a.doctor_id = d.doctor_id " +
+                      "LEFT JOIN User u_doctor ON d.user_id = u_doctor.user_id " +
+                      "LEFT JOIN Patient p ON a.patient_id = p.patient_id " +
+                      "LEFT JOIN User u_patient ON p.user_id = u_patient.user_id " +
+                      "LEFT JOIN Availability av ON a.availability_id = av.availability_id " +
+                      "WHERE a.appointment_id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, appointmentId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                Date apptDate = rs.getDate("appointment_date");
+                return new Appointment(
+                    rs.getInt("appointment_id"),
+                    rs.getInt("doctor_id"),
+                    rs.getInt("patient_id"),
+                    rs.getInt("availability_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("status"),
+                    rs.getString("notes"),
+                    rs.getString("diagnosis"),
+                    rs.getString("prescription"),
+                    apptDate,
+                    rs.getString("time_slot"),
+                    rs.getString("doctor_name"),
+                    rs.getString("patient_name")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return null;
+    }
+
     // Cancel appointment
     public static boolean cancelAppointment(int appointmentId, int cancelledByUserId) {
         System.out.println("=== cancelAppointment Called ===");
         System.out.println("appointmentId: " + appointmentId);
         System.out.println("cancelledByUserId: " + cancelledByUserId);
         
+        String checkStatusQuery = "SELECT status FROM Appointment WHERE appointment_id = ?";
         String getAvailabilityQuery = "SELECT availability_id FROM Appointment WHERE appointment_id = ?";
         String updateQuery = "UPDATE Appointment SET status = ? WHERE appointment_id = ?";
         String updateAvailability = "UPDATE Availability SET is_booked = FALSE WHERE availability_id = ?";
@@ -1208,6 +1429,19 @@ public class DatabaseQuery {
         
         try (Connection conn = DatabaseConnection.getConnection()) {
             System.out.println("Database connection: " + conn);
+            
+            // Check if appointment is completed
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkStatusQuery)) {
+                checkStmt.setInt(1, appointmentId);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    String status = rs.getString("status");
+                    if ("completed".equalsIgnoreCase(status)) {
+                        System.out.println("Cannot cancel completed appointment: " + appointmentId);
+                        return false;
+                    }
+                }
+            }
             
             // Get availability_id first
             int availabilityId = -1;
@@ -1224,7 +1458,7 @@ public class DatabaseQuery {
             
             // Update appointment status
             try (PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
-                stmt.setString(1, "Cancelled");
+                stmt.setString(1, "cancelled");
                 stmt.setInt(2, appointmentId);
                 int updated = stmt.executeUpdate();
                 System.out.println("Appointment status updated. Rows affected: " + updated);
@@ -1333,7 +1567,7 @@ public class DatabaseQuery {
             
             // Reactivate appointment
             try (PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
-                stmt.setString(1, "Scheduled");
+                stmt.setString(1, "scheduled");
                 stmt.setInt(2, appointmentId);
                 int updated = stmt.executeUpdate();
                 System.out.println("Appointment reactivated. Rows affected: " + updated);
@@ -1369,48 +1603,6 @@ public class DatabaseQuery {
         return false;
     }
 
-    // Get a single appointment by ID
-    public static Appointment getAppointmentById(int appointmentId) {
-        String query = "SELECT a.*, " +
-                      "d.name AS doctor_name, " +
-                      "p.name AS patient_name, " +
-                      "av.time_slot " +
-                      "FROM Appointment a " +
-                      "LEFT JOIN Doctor d ON a.doctor_id = d.doctor_id " +
-                      "LEFT JOIN Patient p ON a.patient_id = p.patient_id " +
-                      "LEFT JOIN Availability av ON a.availability_id = av.availability_id " +
-                      "WHERE a.appointment_id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-            
-            stmt.setInt(1, appointmentId);
-            ResultSet rs = stmt.executeQuery();
-            
-            if (rs.next()) {
-                Date apptDate = rs.getDate("appointment_date");
-                return new Appointment(
-                    rs.getInt("appointment_id"),
-                    rs.getInt("doctor_id"),
-                    rs.getInt("patient_id"),
-                    rs.getInt("availability_id"),
-                    rs.getInt("hospital_id"),
-                    rs.getString("status"),
-                    rs.getString("notes"),
-                    rs.getString("diagnosis"),
-                    rs.getString("prescription"),
-                    apptDate,
-                    rs.getString("time_slot"),
-                    rs.getString("doctor_name"),
-                    rs.getString("patient_name")
-                );
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        return null;
-    }
     // Get cancelled appointment ID for a patient by availability
     public static int getCancelledAppointmentByAvailability(int patientId, int availabilityId) {
         String query = "SELECT appointment_id FROM Appointment " +
@@ -1471,8 +1663,8 @@ public class DatabaseQuery {
 
     // Change password for any user
     public static boolean changePassword(int userId, String oldPassword, String newPassword) {
-        String getQuery = "SELECT password_hash FROM User WHERE user_id = ?";
-        String updateQuery = "UPDATE User SET password_hash = ? WHERE user_id = ?";
+        String getQuery = "SELECT password FROM User WHERE user_id = ?";
+        String updateQuery = "UPDATE User SET password = ? WHERE user_id = ?";
         
         try (Connection conn = DatabaseConnection.getConnection()) {
             // Get current password hash
@@ -1481,19 +1673,24 @@ public class DatabaseQuery {
                 stmt.setInt(1, userId);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
-                    currentHash = rs.getString("password_hash");
+                    currentHash = rs.getString("password");
                 } else {
                     return false; // User not found
                 }
             }
             
-            // Verify old password
-            if (currentHash == null || !PasswordUtil.checkPassword(oldPassword, currentHash)) {
+            // Verify old password - basit karşılaştırma (hash yoksa)
+            if (currentHash == null) {
+                return false; // User not found
+            }
+            
+            // Eski şifre kontrolü (düz metin)
+            if (!oldPassword.equals(currentHash)) {
                 return false; // Old password incorrect
             }
             
-            // Hash new password
-            String newHash = PasswordUtil.hashPassword(newPassword);
+            // Yeni şifreyi düz metin olarak sakla (hash yok)
+            String newHash = newPassword;
             
             // Update password
             try (PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
@@ -1508,4 +1705,462 @@ public class DatabaseQuery {
         }
         return false;
     }
-}
+
+    // ========== REVIEW/RATING METHODS (SRS-HMS-004) ==========
+    
+    /**
+     * Create a review for a doctor after completed appointment
+     */
+    public static boolean createReview(int patientId, int doctorId, Integer appointmentId,
+                                       int hospitalId, int rating, String comment, boolean isAnonymous) {
+        String query = "INSERT INTO Review (patient_id, doctor_id, appointment_id, hospital_id, " +
+                      "rating, comment, review_date, is_anonymous) VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            if (isAnonymous) {
+                stmt.setNull(1, Types.INTEGER);
+            } else {
+                stmt.setInt(1, patientId);
+            }
+            stmt.setInt(2, doctorId);
+            if (appointmentId != null) {
+                stmt.setInt(3, appointmentId);
+            } else {
+                stmt.setNull(3, Types.INTEGER);
+            }
+            stmt.setInt(4, hospitalId);
+            stmt.setInt(5, rating);
+            stmt.setString(6, comment);
+            stmt.setBoolean(7, isAnonymous);
+            
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Get all reviews for a specific doctor
+     */
+    public static List<Review> getReviewsByDoctor(int doctorId) {
+        List<Review> reviews = new ArrayList<>();
+        String query = "SELECT r.*, u.name as patient_name FROM Review r " +
+                      "LEFT JOIN Patient p ON r.patient_id = p.patient_id " +
+                      "LEFT JOIN User u ON p.user_id = u.user_id " +
+                      "WHERE r.doctor_id = ? ORDER BY r.review_date DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, doctorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                Review review = new Review(
+                    rs.getInt("review_id"),
+                    rs.getInt("patient_id"),
+                    rs.getInt("doctor_id"),
+                    rs.getObject("appointment_id") != null ? rs.getInt("appointment_id") : null,
+                    rs.getInt("hospital_id"),
+                    rs.getInt("rating"),
+                    rs.getString("comment"),
+                    rs.getDate("review_date"),
+                    rs.getBoolean("is_anonymous")
+                );
+                // Set patient name only if not anonymous
+                if (!review.isAnonymous()) {
+                    review.setPatientName(rs.getString("patient_name"));
+                } else {
+                    review.setPatientName("Anonim");
+                }
+                reviews.add(review);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return reviews;
+    }
+
+    /**
+     * Get average rating for a doctor
+     */
+    public static double getAverageRatingForDoctor(int doctorId) {
+        String query = "SELECT AVG(rating) as avg_rating FROM Review WHERE doctor_id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, doctorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getDouble("avg_rating");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+
+    /**
+     * Check if patient has already reviewed an appointment
+     */
+    public static boolean hasReviewedAppointment(int patientId, int appointmentId) {
+        String query = "SELECT COUNT(*) FROM Review WHERE appointment_id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, appointmentId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Get completed appointments for a patient that haven't been reviewed yet
+     */
+    public static List<Appointment> getCompletedAppointmentsWithoutReview(int patientId) {
+        List<Appointment> appointments = new ArrayList<>();
+        String query = "SELECT a.*, d.*, u.name as doctor_name, av.date, av.time_slot, " +
+                      "h.name as hospital_name " +
+                      "FROM Appointment a " +
+                      "JOIN Doctor d ON a.doctor_id = d.doctor_id " +
+                      "JOIN User u ON d.user_id = u.user_id " +
+                      "JOIN Availability av ON a.availability_id = av.availability_id " +
+                      "JOIN Hospital h ON a.hospital_id = h.hospital_id " +
+                      "WHERE a.patient_id = ? AND a.status = 'completed' " +
+                      "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.appointment_id = a.appointment_id) " +
+                      "ORDER BY av.date DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, patientId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                Appointment appointment = new Appointment(
+                    rs.getInt("appointment_id"),
+                    rs.getInt("doctor_id"),
+                    rs.getInt("patient_id"),
+                    rs.getInt("availability_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("status"),
+                    rs.getString("notes"),
+                    null, // diagnosis
+                    null, // prescription
+                    rs.getDate("date"),
+                    rs.getTime("time_slot").toString(),
+                    rs.getString("doctor_name"),
+                    null // patient_name - not in this query
+                );
+                appointments.add(appointment);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return appointments;
+    }
+
+    // Get hospital by name
+    public static Hospital getHospitalByName(String name) {
+        String query = "SELECT * FROM Hospital WHERE name = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, name);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new Hospital(
+                    rs.getInt("hospital_id"),
+                    rs.getString("name"),
+                    rs.getString("address"),
+                    rs.getString("phone"),
+                    rs.getString("city")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Get doctors by hospital and specialty name
+    public static List<Doctor> getDoctorsByHospitalAndSpecialty(int hospitalId, String specialtyName) {
+        List<Doctor> doctors = new ArrayList<>();
+        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d " +
+                      "JOIN User u ON d.user_id = u.user_id " +
+                      "JOIN Specialty s ON d.specialty_id = s.specialty_id " +
+                      "WHERE d.hospital_id = ? AND s.name = ? ORDER BY u.name";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, hospitalId);
+            stmt.setString(2, specialtyName);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                doctors.add(new Doctor(
+                    rs.getInt("doctor_id"),
+                    rs.getInt("user_id"),
+                    rs.getInt("specialty_id"),
+                    rs.getInt("clinic_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("license_no"),
+                    rs.getInt("experience"),
+                    rs.getString("education"),
+                    rs.getDouble("consultation_fee"),
+                    rs.getString("name"),
+                    rs.getString("specialty_name")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return doctors;
+    }
+
+    // Get doctor by name
+    public static Doctor getDoctorByName(String name) {
+        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d " +
+                      "JOIN User u ON d.user_id = u.user_id " +
+                      "LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id " +
+                      "WHERE u.name = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, name);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return new Doctor(
+                    rs.getInt("doctor_id"),
+                    rs.getInt("user_id"),
+                    rs.getInt("specialty_id"),
+                    rs.getInt("clinic_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getString("license_no"),
+                    rs.getInt("experience"),
+                    rs.getString("education"),
+                    rs.getDouble("consultation_fee"),
+                    rs.getString("name"),
+                    rs.getString("specialty_name")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Get available slots for a doctor at a hospital
+    public static List<AvailabilityOption> getAvailableSlots(int doctorId, int hospitalId) {
+        List<AvailabilityOption> slots = new ArrayList<>();
+        String query = "SELECT a.*, h.name as hospital_name, u.name as doctor_name " +
+                      "FROM Availability a " +
+                      "JOIN Doctor d ON a.doctor_id = d.doctor_id " +
+                      "JOIN User u ON d.user_id = u.user_id " +
+                      "JOIN Hospital h ON h.hospital_id = ? " +
+                      "LEFT JOIN Appointment app ON a.availability_id = app.availability_id AND LOWER(app.status) IN ('scheduled', 'completed', 'rescheduled') " +
+                      "WHERE a.doctor_id = ? AND d.hospital_id = ? " +
+                      "AND app.appointment_id IS NULL " +
+                      "AND a.date >= CURDATE() " +
+                      "ORDER BY a.date, a.time_slot";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, hospitalId);
+            stmt.setInt(2, doctorId);
+            stmt.setInt(3, hospitalId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                slots.add(new AvailabilityOption(
+                    rs.getInt("availability_id"),
+                    rs.getInt("doctor_id"),
+                    hospitalId,
+                    rs.getDate("date"),
+                    rs.getTime("time_slot").toString(),
+                    rs.getString("hospital_name"),
+                    rs.getString("doctor_name")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return slots;
+    }
+
+    // Get all available slots for a doctor (across all hospitals)
+    public static List<AvailabilityOption> getAllAvailableSlotsForDoctor(int doctorId) {
+        List<AvailabilityOption> slots = new ArrayList<>();
+        String query = "SELECT a.*, h.name as hospital_name, u.name as doctor_name, d.hospital_id " +
+                      "FROM Availability a " +
+                      "JOIN Doctor d ON a.doctor_id = d.doctor_id " +
+                      "JOIN User u ON d.user_id = u.user_id " +
+                      "JOIN Hospital h ON d.hospital_id = h.hospital_id " +
+                      "LEFT JOIN Appointment app ON a.availability_id = app.availability_id AND LOWER(app.status) IN ('scheduled', 'completed', 'rescheduled') " +
+                      "WHERE a.doctor_id = ? " +
+                      "AND app.appointment_id IS NULL " +
+                      "AND a.date >= CURDATE() " +
+                      "ORDER BY a.date, a.time_slot";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, doctorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                slots.add(new AvailabilityOption(
+                    rs.getInt("availability_id"),
+                    rs.getInt("doctor_id"),
+                    rs.getInt("hospital_id"),
+                    rs.getDate("date"),
+                    rs.getTime("time_slot").toString(),
+                    rs.getString("hospital_name"),
+                    rs.getString("doctor_name")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return slots;
+    }
+
+    // Get user by TC number
+    public static User getUserByTcNo(String tcNo) {
+        String query = "SELECT u.*, r.name as role_name FROM User u LEFT JOIN Role r ON u.role_id = r.role_id WHERE u.tc_no = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, tcNo);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new User(
+                    rs.getInt("user_id"),
+                    rs.getString("name"),
+                    rs.getString("email"),
+                    rs.getString("password"),
+                    rs.getString("phone"),
+                    rs.getString("address"),
+                    rs.getInt("role_id"),
+                    rs.getString("role_name")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Search patients by name (partial match)
+    public static List<Patient> searchPatientsByName(String namePattern) {
+        List<Patient> patients = new ArrayList<>();
+        String query = "SELECT p.*, u.name, u.email, u.phone FROM Patient p " +
+                      "JOIN User u ON p.user_id = u.user_id " +
+                      "WHERE LOWER(u.name) LIKE LOWER(?) ORDER BY u.name";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, "%" + namePattern + "%");
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                patients.add(new Patient(
+                    rs.getInt("patient_id"),
+                    rs.getInt("user_id"),
+                    rs.getString("blood_type"),
+                    rs.getDate("date_of_birth"),
+                    rs.getString("insurance_no"),
+                    rs.getString("emergency_contact"),
+                    rs.getString("name"),
+                    rs.getString("email"),
+                    rs.getString("phone")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return patients;
+    }
+
+    // Manager için randevu durumunu güncelle
+    public static boolean updateAppointmentDetails(int appointmentId, String diagnosis, String prescription, String notes) {
+        String sql = "UPDATE Appointment SET diagnosis = ?, prescription = ?, notes = ? WHERE appointment_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, diagnosis);
+            stmt.setString(2, prescription);
+            stmt.setString(3, notes);
+            stmt.setInt(4, appointmentId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public static boolean updateAppointmentStatus(int appointmentId, String newStatus) {
+        String update = "UPDATE Appointment SET status = ? WHERE appointment_id = ?";
+        String getAvailabilityId = "SELECT availability_id FROM Appointment WHERE appointment_id = ?";
+        String updateAvailability = "UPDATE Availability SET is_booked = ? WHERE availability_id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Önce availability_id'yi al
+            int availabilityId = -1;
+            try (PreparedStatement getStmt = conn.prepareStatement(getAvailabilityId)) {
+                getStmt.setInt(1, appointmentId);
+                ResultSet rs = getStmt.executeQuery();
+                if (rs.next()) {
+                    availabilityId = rs.getInt("availability_id");
+                }
+            }
+            
+            // Appointment durumunu güncelle
+            try (PreparedStatement stmt = conn.prepareStatement(update)) {
+                stmt.setString(1, newStatus);
+                stmt.setInt(2, appointmentId);
+                stmt.executeUpdate();
+            }
+            
+            // Eğer cancelled yapıldıysa, availability'yi serbest bırak (is_booked = 0)
+            if (availabilityId != -1 && "cancelled".equalsIgnoreCase(newStatus)) {
+                try (PreparedStatement availStmt = conn.prepareStatement(updateAvailability)) {
+                    availStmt.setInt(1, 0); // is_booked = 0 (boş)
+                    availStmt.setInt(2, availabilityId);
+                    availStmt.executeUpdate();
+                }
+            }
+            
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Availability ekleme (hospital_id kolonu olmayan şema için)
+    public static boolean addAvailability(int doctorId, java.sql.Date date, String timeSlot) {
+        String insert = "INSERT INTO Availability (doctor_id, date, time_slot) VALUES (?,?,?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(insert)) {
+            stmt.setInt(1, doctorId);
+            stmt.setDate(2, date);
+            stmt.setString(3, timeSlot);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }}
