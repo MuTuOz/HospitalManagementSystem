@@ -2,24 +2,16 @@ package com.hospitalmanagement;
 
 import com.hospitalmanagement.service.UserService;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.prefs.Preferences;
+import java.util.Base64;
 
 public class LoginController {
-    
+
     // Service layer instance
     private final UserService userService = new UserService();
 
@@ -41,9 +33,18 @@ public class LoginController {
     @FXML
     private Hyperlink forgotPasswordLink;
 
+    @FXML
+    private CheckBox rememberMeCheckBox;
+
     // Login attempt tracking (DB-backed)
     private static final int MAX_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(10);
+
+    // Remember Me preferences
+    private static final Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
+    private static final String PREF_USERNAME = "remembered_username";
+    private static final String PREF_PASSWORD = "remembered_password";
+    private static final String PREF_REMEMBER = "remember_me";
 
     @FXML
     private void initialize() {
@@ -66,6 +67,9 @@ public class LoginController {
 
         // Error label'ını başlangıçta gizle
         errorLabel.setVisible(false);
+
+        // Load saved credentials if "Remember Me" was checked
+        loadSavedCredentials();
     }
 
     @FXML
@@ -79,7 +83,8 @@ public class LoginController {
         }
 
         // Basit e-posta format kontrolü (use ValidationUtil)
-        if (!ValidationUtil.validateEmail(username)) return;
+        if (!ValidationUtil.validateEmail(username))
+            return;
 
         // Fetch user from DB
         User user = null;
@@ -121,6 +126,14 @@ public class LoginController {
         if (authed != null) {
             // Success - reset counters
             userService.resetFailedAttempts(authed.getUserId());
+
+            // Save credentials if Remember Me is checked
+            if (rememberMeCheckBox != null && rememberMeCheckBox.isSelected()) {
+                saveCredentials(username, password);
+            } else {
+                clearSavedCredentials();
+            }
+
             showSuccess("Giriş başarılı! Hoş geldiniz " + authed.getName());
             Session.setCurrentUser(authed);
             redirectToUserDashboard(authed);
@@ -129,7 +142,8 @@ public class LoginController {
             try {
                 int attempts = userService.incrementFailedAttempts(user.getUserId());
                 if (attempts >= MAX_ATTEMPTS) {
-                    java.sql.Timestamp until = new java.sql.Timestamp(System.currentTimeMillis() + LOCK_DURATION.toMillis());
+                    java.sql.Timestamp until = new java.sql.Timestamp(
+                            System.currentTimeMillis() + LOCK_DURATION.toMillis());
                     userService.setLockUntil(user.getUserId(), until);
                     showError("Çok fazla başarısız giriş. Hesap 10 dakika kilitlendi.");
                 } else {
@@ -164,7 +178,8 @@ public class LoginController {
             return true;
         });
         var eRes = emailDialog.showAndWait();
-        if (eRes.isEmpty() || eRes.get().isBlank()) return;
+        if (eRes.isEmpty() || eRes.get().isBlank())
+            return;
         String email = eRes.get().trim();
 
         User user = userService.findUserByEmail(email);
@@ -193,7 +208,8 @@ public class LoginController {
             pwdDialog.getDialogPane().setContent(grid);
             pwdDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
             pwdDialog.setResultConverter(btn -> {
-                if (btn == ButtonType.OK) return p1.getText();
+                if (btn == ButtonType.OK)
+                    return p1.getText();
                 return null;
             });
             DialogUtil.attachOkValidation(pwdDialog, () -> {
@@ -213,7 +229,8 @@ public class LoginController {
                 return true;
             });
             var pwdRes = pwdDialog.showAndWait();
-            if (pwdRes.isEmpty() || pwdRes.get() == null) return;
+            if (pwdRes.isEmpty() || pwdRes.get() == null)
+                return;
             String newPwd = pwdRes.get();
 
             // Save plaintext password
@@ -293,10 +310,14 @@ public class LoginController {
             String pw = passwordField.getText();
             String ph = phoneField.getText();
             String dobTxt = dobField.getText();
-            if (!ValidationUtil.validateNotEmpty(n, "Ad Soyad")) return false;
-            if (!ValidationUtil.validateEmail(em)) return false;
-            if (!ValidationUtil.validatePassword(pw)) return false;
-            if (!ValidationUtil.validatePhone(ph)) return false;
+            if (!ValidationUtil.validateNotEmpty(n, "Ad Soyad"))
+                return false;
+            if (!ValidationUtil.validateEmail(em))
+                return false;
+            if (!ValidationUtil.validatePassword(pw))
+                return false;
+            if (!ValidationUtil.validatePhone(ph))
+                return false;
             if (dobTxt != null && !dobTxt.isBlank()) {
                 try {
                     java.time.LocalDate.parse(dobTxt.trim());
@@ -314,7 +335,8 @@ public class LoginController {
         });
 
         var res = dialog.showAndWait();
-        if (res.isEmpty() || res.get() == null) return;
+        if (res.isEmpty() || res.get() == null)
+            return;
         var data = res.get();
 
         // Validate inputs
@@ -334,7 +356,8 @@ public class LoginController {
             return;
         }
 
-        // Password strength: min 8 chars, at least one uppercase, one digit, one special char
+        // Password strength: min 8 chars, at least one uppercase, one digit, one
+        // special char
         if (!pwd.matches("^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$")) {
             showError("Şifre en az 8 karakter, bir büyük harf, bir rakam ve bir özel karakter içermelidir.");
             return;
@@ -361,7 +384,8 @@ public class LoginController {
             // Try capitalized
             roleId = DatabaseQuery.getRoleIdByName("Patient");
         }
-        if (roleId == null) roleId = 4; // fallback
+        if (roleId == null)
+            roleId = 4; // fallback
 
         // Save plaintext password
         boolean created = DatabaseQuery.createUser(name, email, pwd, phone, address, roleId);
@@ -376,8 +400,11 @@ public class LoginController {
                 try {
                     var patient = DatabaseQuery.getPatientByUserId(user.getUserId());
                     if (patient == null) {
-                        boolean pcreated = DatabaseQuery.createPatient(user.getUserId(), dob == null ? new java.sql.Date(System.currentTimeMillis()) : dob, null, insuranceField.getText(), null);
-                        if (pcreated) System.out.println("Patient kaydı oluşturuldu.");
+                        boolean pcreated = DatabaseQuery.createPatient(user.getUserId(),
+                                dob == null ? new java.sql.Date(System.currentTimeMillis()) : dob, null,
+                                insuranceField.getText(), null);
+                        if (pcreated)
+                            System.out.println("Patient kaydı oluşturuldu.");
                     }
                 } catch (Exception ex) {
                     System.out.println("Patient kaydı oluşturulurken hata: " + ex.getMessage());
@@ -416,15 +443,73 @@ public class LoginController {
         return null;
     }
 
+    /**
+     * Save user credentials for Remember Me feature
+     * Uses simple Base64 encoding (not high security, but better than plain text)
+     */
+    private void saveCredentials(String username, String password) {
+        try {
+            prefs.put(PREF_USERNAME, username);
+            // Simple encoding - not perfect security but better than plain text
+            String encoded = Base64.getEncoder().encodeToString(password.getBytes());
+            prefs.put(PREF_PASSWORD, encoded);
+            prefs.putBoolean(PREF_REMEMBER, true);
+            prefs.flush();
+        } catch (Exception e) {
+            System.err.println("Failed to save credentials: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load saved credentials if Remember Me was previously checked
+     */
+    private void loadSavedCredentials() {
+        try {
+            boolean rememberMe = prefs.getBoolean(PREF_REMEMBER, false);
+            if (rememberMe) {
+                String savedUsername = prefs.get(PREF_USERNAME, "");
+                String encodedPassword = prefs.get(PREF_PASSWORD, "");
+
+                if (!savedUsername.isEmpty() && !encodedPassword.isEmpty()) {
+                    usernameField.setText(savedUsername);
+                    // Decode password
+                    String decodedPassword = new String(Base64.getDecoder().decode(encodedPassword));
+                    passwordField.setText(decodedPassword);
+
+                    if (rememberMeCheckBox != null) {
+                        rememberMeCheckBox.setSelected(true);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to load credentials: " + e.getMessage());
+            clearSavedCredentials();
+        }
+    }
+
+    /**
+     * Clear saved credentials
+     */
+    private void clearSavedCredentials() {
+        try {
+            prefs.remove(PREF_USERNAME);
+            prefs.remove(PREF_PASSWORD);
+            prefs.putBoolean(PREF_REMEMBER, false);
+            prefs.flush();
+        } catch (Exception e) {
+            System.err.println("Failed to clear credentials: " + e.getMessage());
+        }
+    }
+
     private void redirectToUserDashboard(User user) {
         try {
             // Use GUIManager for scene switching (following UML architecture)
             Stage stage = (Stage) loginButton.getScene().getWindow();
             GUIManager guiManager = new GUIManager(stage);
-            
+
             // Polymorphic dispatch based on user type (instanceof checks)
             guiManager.switchToUserDashboard(user);
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             showError("Sayfa yüklenirken hata oluştu: " + e.getMessage());
