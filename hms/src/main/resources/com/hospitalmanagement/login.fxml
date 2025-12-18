@@ -44,13 +44,18 @@
             <VBox spacing="8">
                <children>
                   <Label style="-fx-font-size: 14px; -fx-text-fill: #4a90e2; -fx-font-weight: normal;" text="Enter password" />
-                  <PasswordField fx:id="passwordField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #4a90e2; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+                  <StackPane>
+                     <PasswordField fx:id="passwordField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #4a90e2; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" />
+                     <TextField fx:id="passwordTextField" prefHeight="45.0" style="-fx-font-size: 14px; -fx-background-color: white; -fx-border-color: #4a90e2; -fx-border-width: 0 0 2 0; -fx-background-insets: 0; -fx-border-insets: 0;" visible="false" />
+                  </StackPane>
                </children>
             </VBox>
 
-            <!-- Forgot Password Link -->
-            <HBox alignment="CENTER_RIGHT">
+            <!-- Show Password & Forgot Password -->
+            <HBox alignment="CENTER_LEFT" spacing="10">
                <children>
+                  <CheckBox fx:id="showPasswordCheckBox" onAction="#togglePasswordVisibility" style="-fx-text-fill: #666; -fx-font-size: 12px;" text="Show Password" />
+                  <Region HBox.hgrow="ALWAYS" />
                   <Hyperlink fx:id="forgotPasswordLink" onAction="#handleForgotPassword" style="-fx-text-fill: #4a90e2; -fx-font-size: 12px;" text="forgot password ?" />
                </children>
             </HBox>

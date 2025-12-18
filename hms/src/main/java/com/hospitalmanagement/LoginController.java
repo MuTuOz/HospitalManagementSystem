@@ -28,6 +28,12 @@ public class LoginController {
 
     @FXML
     private PasswordField passwordField;
+    
+    @FXML
+    private TextField passwordTextField;
+    
+    @FXML
+    private CheckBox showPasswordCheckBox;
 
     @FXML
     private Button loginButton;
@@ -66,12 +72,27 @@ public class LoginController {
 
         // Error label'ını başlangıçta gizle
         errorLabel.setVisible(false);
+        
+        // Bind text fields for show/hide password
+        passwordTextField.textProperty().bindBidirectional(passwordField.textProperty());
+    }
+    
+    @FXML
+    private void togglePasswordVisibility() {
+        if (showPasswordCheckBox.isSelected()) {
+            passwordTextField.setVisible(true);
+            passwordField.setVisible(false);
+        } else {
+            passwordField.setVisible(true);
+            passwordTextField.setVisible(false);
+        }
     }
 
     @FXML
     private void handleLogin() {
         String username = usernameField.getText().trim();
-        String password = passwordField.getText();
+        String password = showPasswordCheckBox.isSelected() ? 
+                          passwordTextField.getText() : passwordField.getText();
 
         if (username.isEmpty() || password.isEmpty()) {
             showError("Kullanıcı adı ve şifre boş olamaz!");
