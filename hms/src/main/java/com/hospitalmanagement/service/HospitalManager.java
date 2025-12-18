@@ -163,4 +163,28 @@ public class HospitalManager {
     public boolean deleteHospital(int hospitalId) {
         return DatabaseQuery.deleteHospital(hospitalId);
     }
+    
+    /**
+     * Create a medical record with diagnosis
+     * SRS-HMS-007: Doctors can create medical records for patients
+     */
+    public int createMedicalRecord(int patientId, int doctorId, Integer appointmentId, 
+                                    int hospitalId, String diagnosis, String testResults, 
+                                    String medications, String notes) {
+        // First create the basic record
+        boolean created = DatabaseQuery.createMedicalRecord(patientId, doctorId, appointmentId, 
+                                                           hospitalId, testResults, medications, notes);
+        if (!created) {
+            return -1;
+        }
+        
+        // Get the newly created record ID
+        var records = DatabaseQuery.getMedicalRecordsByPatient(patientId);
+        if (records.isEmpty()) {
+            return -1;
+        }
+        
+        // Return the most recent record ID
+        return records.get(records.size() - 1).getRecordId();
+    }
 }
