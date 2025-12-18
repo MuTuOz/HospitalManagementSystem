@@ -81,20 +81,38 @@ public class GUIManager {
         
         // Set minimum scene size for login/primary screen
         if ("primary".equals(fxmlName) || "login".equals(fxmlName)) {
+            // If user is coming from a maximized dashboard, reset window state first.
+            stage.setMaximized(false);
+            stage.setFullScreen(false);
             scene = new Scene(root, 900, 600);
+            applyTheme(scene);
             stage.setScene(scene);
-            stage.setTitle(title);
+            // Match the startup login window title exactly.
+            stage.setTitle("Hospital Management System");
             stage.setResizable(false);
+            stage.sizeToScene();
+            stage.centerOnScreen();
         } else {
-            scene = new Scene(root);
+            // Dashboard screens - start maximized but allow resizing
+            scene = new Scene(root, 1024, 768);
+            applyTheme(scene);
             stage.setScene(scene);
             stage.setTitle(title);
+            stage.setResizable(true);
             stage.setMaximized(true);
         }
         
         stage.show();
     }
 
+    private void applyTheme(Scene scene) {
+        try {
+            scene.getStylesheets().clear();
+            scene.getStylesheets().add(App.class.getResource("theme.css").toExternalForm());
+        } catch (Exception e) {
+            System.out.println("Tema yüklenemedi: " + e.getMessage());
+        }
+    }
     /**
      * Switch scene based on user role
      */
