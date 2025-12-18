@@ -21,6 +21,7 @@ Button {
 
 Button:hover {
     -fx-background-color: linear-gradient(#00d1c6, #00b3a6);
+    
 }
 
 TextField, PasswordField, ComboBox, TextArea, ListView {
@@ -82,3 +83,4 @@ TableView {
 .list-view {
     -fx-border-color: #e6fff9;
 }
+
