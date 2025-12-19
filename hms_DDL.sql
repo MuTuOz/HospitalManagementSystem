@@ -18,6 +18,8 @@ CREATE TABLE User (
                       password VARCHAR(255) NOT NULL,
                       phone VARCHAR(20),
                       address TEXT,
+                      failed_attempts INT DEFAULT 0,
+                      locked_until TIMESTAMP NULL,
                       role_id INT NOT NULL,
                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -163,7 +165,7 @@ CREATE TABLE Medical_Record (
 -- Review Tablosu
 CREATE TABLE Review (
                         review_id INT PRIMARY KEY AUTO_INCREMENT,
-                        patient_id INT NOT NULL,
+                        patient_id INT,
                         doctor_id INT NOT NULL,
                         appointment_id INT,
                         hospital_id INT NOT NULL,
@@ -178,4 +180,18 @@ CREATE TABLE Review (
                         FOREIGN KEY (hospital_id) REFERENCES Hospital(hospital_id) ON DELETE CASCADE ON UPDATE CASCADE,
                         INDEX idx_doctor (doctor_id),
                         INDEX idx_rating (rating)
+);
+
+-- User_Activity Tablosu (Kullanıcı aktivite logu)
+CREATE TABLE User_Activity (
+                               activity_id INT PRIMARY KEY AUTO_INCREMENT,
+                               user_id INT NOT NULL,
+                               activity_type VARCHAR(50) NOT NULL,
+                               description TEXT,
+                               ip_address VARCHAR(45),
+                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+                               INDEX idx_user_id (user_id),
+                               INDEX idx_activity_type (activity_type),
+                               INDEX idx_created_at (created_at)
 );
