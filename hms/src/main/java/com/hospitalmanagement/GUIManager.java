@@ -41,7 +41,7 @@ public class GUIManager {
      * Switch to login screen
      */
     public void switchToLogin() throws IOException {
-        loadAndSwitch("primary", "Hospital Management System - Login");
+        loadAndSwitch("login", "Hospital Management System - Login");
     }
 
     /**
