@@ -354,9 +354,20 @@ public class ManagerDashboardController {
     @FXML
     private void loadAppointments() {
         System.out.println("Randevular yükleniyor...");
-        var appointments = DatabaseQuery.getAllAppointments();
-        if (appointmentTableView != null && appointments != null) {
-            appointmentTableView.setItems(FXCollections.observableArrayList(appointments));
+        var user = Session.getCurrentUser();
+        if (user == null) return;
+        
+        int hospitalId = DatabaseQuery.getHospitalIdByManagerUserId(user.getUserId());
+        if (hospitalId <= 0) return;
+        
+        // Only load appointments for the manager's hospital
+        var allAppointments = DatabaseQuery.getAllAppointments();
+        var filteredAppointments = allAppointments.stream()
+            .filter(app -> app.getHospitalId() == hospitalId)
+            .collect(java.util.stream.Collectors.toList());
+        
+        if (appointmentTableView != null && filteredAppointments != null) {
+            appointmentTableView.setItems(FXCollections.observableArrayList(filteredAppointments));
         }
     }
 
@@ -368,9 +379,21 @@ public class ManagerDashboardController {
     @FXML
     private void loadStatistics() {
         System.out.println("İstatistikler yükleniyor...");
-        var hospitals = hospitalManager.getAllHospitals();
-        var doctors = DatabaseQuery.getAllDoctors();
-        String stats = String.format("Toplam Hastane: %d\nToplam Doktor/Personel: %d", hospitals.size(), doctors.size());
+        var user = Session.getCurrentUser();
+        if (user == null) return;
+        
+        int hospitalId = DatabaseQuery.getHospitalIdByManagerUserId(user.getUserId());
+        if (hospitalId <= 0) return;
+        
+        // Only show statistics for the manager's hospital
+        var doctors = DatabaseQuery.getDoctorsByHospital(hospitalId);
+        var allAppointments = DatabaseQuery.getAllAppointments();
+        long appointmentCount = allAppointments.stream()
+            .filter(app -> app.getHospitalId() == hospitalId)
+            .count();
+        
+        String stats = String.format("Bu Hastanedeki Doktorlar: %d\nBu Hastanenin Randevuları: %d", 
+            doctors.size(), appointmentCount);
         if (statisticsLabel != null) {
             statisticsLabel.setText(stats);
         }
