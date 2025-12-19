@@ -29,13 +29,14 @@ public class ValidationUtil {
     }
 
     // Validate phone format (optional field, but if provided should be valid)
+    // SRS-HMS-001.1: Phone number format (e.g., +90 555 123 4567)
     public static boolean validatePhone(String phone) {
         if (phone == null || phone.isBlank()) {
             return true; // Phone is optional
         }
-        // Accept 10-15 digits, spaces, dashes, parentheses
-        if (!phone.matches("^[\\d\\s\\-()]{10,15}$")) {
-            showError("Telefon numarası geçersiz (10-15 karakter, rakam/boşluk/tire/parantez).");
+        // Accept +90 format with spaces
+        if (!phone.matches("^\\+90\\s?[0-9]{3}\\s?[0-9]{3}\\s?[0-9]{4}$")) {
+            showError("Telefon numarası geçersiz. Format: +90 555 123 4567");
             return false;
         }
         return true;
@@ -69,14 +70,15 @@ public class ValidationUtil {
         return true;
     }
 
-    // Validate password strength (min 6 chars, at least one uppercase, one lowercase, one digit)
+    // Validate password strength (min 8 chars, at least one uppercase, one lowercase, one digit, one special char)
+    // SRS-HMS-001.1: minimum 8 characters, at least one uppercase letter, one number, and one special character
     public static boolean validatePassword(String password) {
         if (password == null || password.isBlank()) {
             showError("Parola boş olamaz.");
             return false;
         }
-        if (password.length() < 6) {
-            showError("Parola en az 6 karakter olmalıdır.");
+        if (password.length() < 8) {
+            showError("Parola en az 8 karakter olmalıdır.");
             return false;
         }
         if (!password.matches(".*[A-Z].*")) {
@@ -89,6 +91,10 @@ public class ValidationUtil {
         }
         if (!password.matches(".*\\d.*")) {
             showError("Parola en az bir rakam içermelidir.");
+            return false;
+        }
+        if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
+            showError("Parola en az bir özel karakter içermelidir (!@#$%^&* vb.).");
             return false;
         }
         return true;
@@ -166,5 +172,31 @@ public class ValidationUtil {
         if (ins == null || ins.isBlank()) return true; // optional field
         // Allow common separators (space, dash, slash) and slightly wider length
         return ins.matches("^[A-Za-z0-9\\-\\s/]{3,30}$");
+    }
+
+    // Validate insurance number with error message (SRS-HMS-003.2 - show only)
+    public static boolean validateInsuranceNo(String insuranceNo) {
+        if (insuranceNo == null || insuranceNo.isBlank()) {
+            return true; // Optional field
+        }
+        // Relaxed validation - allow common formats
+        if (insuranceNo.length() < 3 || insuranceNo.length() > 30) {
+            showError("Sigorta numarası 3-30 karakter arasında olmalıdır.");
+            return false;
+        }
+        if (!insuranceNo.matches("^[A-Za-z0-9\\-\\s/]+$")) {
+            showError("Sigorta numarası geçersiz karakter içeriyor.");
+            return false;
+        }
+        return true;
+    }
+
+    // Validate rating (1-5)
+    public static boolean validateRating(int rating) {
+        if (rating < 1 || rating > 5) {
+            showError("Değerlendirme 1-5 arasında olmalıdır.");
+            return false;
+        }
+        return true;
     }
 }

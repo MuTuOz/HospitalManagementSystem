@@ -12,14 +12,14 @@ public class Review {
     private String comment;
     private Date reviewDate;
     private boolean isAnonymous;
-
+    
     // Additional fields for display
     private String patientName;
     private String doctorName;
 
     public Review(int reviewId, int patientId, int doctorId, Integer appointmentId,
-            int hospitalId, int rating, String comment, Date reviewDate,
-            boolean isAnonymous) {
+                  int hospitalId, int rating, String comment, Date reviewDate,
+                  boolean isAnonymous) {
         this.reviewId = reviewId;
         this.patientId = patientId;
         this.doctorId = doctorId;
@@ -32,93 +32,38 @@ public class Review {
     }
 
     // Getters and Setters
-    public int getReviewId() {
-        return reviewId;
-    }
+    public int getReviewId() { return reviewId; }
+    public void setReviewId(int reviewId) { this.reviewId = reviewId; }
 
-    public void setReviewId(int reviewId) {
-        this.reviewId = reviewId;
-    }
+    public int getPatientId() { return patientId; }
+    public void setPatientId(int patientId) { this.patientId = patientId; }
 
-    public int getPatientId() {
-        return patientId;
-    }
+    public int getDoctorId() { return doctorId; }
+    public void setDoctorId(int doctorId) { this.doctorId = doctorId; }
 
-    public void setPatientId(int patientId) {
-        this.patientId = patientId;
-    }
+    public Integer getAppointmentId() { return appointmentId; }
+    public void setAppointmentId(Integer appointmentId) { this.appointmentId = appointmentId; }
 
-    public int getDoctorId() {
-        return doctorId;
-    }
+    public int getHospitalId() { return hospitalId; }
+    public void setHospitalId(int hospitalId) { this.hospitalId = hospitalId; }
 
-    public void setDoctorId(int doctorId) {
-        this.doctorId = doctorId;
-    }
+    public int getRating() { return rating; }
+    public void setRating(int rating) { this.rating = rating; }
 
-    public Integer getAppointmentId() {
-        return appointmentId;
-    }
+    public String getComment() { return comment; }
+    public void setComment(String comment) { this.comment = comment; }
 
-    public void setAppointmentId(Integer appointmentId) {
-        this.appointmentId = appointmentId;
-    }
+    public Date getReviewDate() { return reviewDate; }
+    public void setReviewDate(Date reviewDate) { this.reviewDate = reviewDate; }
 
-    public int getHospitalId() {
-        return hospitalId;
-    }
+    public boolean isAnonymous() { return isAnonymous; }
+    public void setAnonymous(boolean anonymous) { isAnonymous = anonymous; }
 
-    public void setHospitalId(int hospitalId) {
-        this.hospitalId = hospitalId;
-    }
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
 
-    public int getRating() {
-        return rating;
-    }
-
-    public void setRating(int rating) {
-        this.rating = rating;
-    }
-
-    public String getComment() {
-        return comment;
-    }
-
-    public void setComment(String comment) {
-        this.comment = comment;
-    }
-
-    public Date getReviewDate() {
-        return reviewDate;
-    }
-
-    public void setReviewDate(Date reviewDate) {
-        this.reviewDate = reviewDate;
-    }
-
-    public boolean isAnonymous() {
-        return isAnonymous;
-    }
-
-    public void setAnonymous(boolean anonymous) {
-        isAnonymous = anonymous;
-    }
-
-    public String getPatientName() {
-        return patientName;
-    }
-
-    public void setPatientName(String patientName) {
-        this.patientName = patientName;
-    }
-
-    public String getDoctorName() {
-        return doctorName;
-    }
-
-    public void setDoctorName(String doctorName) {
-        this.doctorName = doctorName;
-    }
+    public String getDoctorName() { return doctorName; }
+    public void setDoctorName(String doctorName) { this.doctorName = doctorName; }
 
     @Override
     public String toString() {

@@ -6,7 +6,6 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
-
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -307,7 +306,7 @@ public class ManagerDashboardController {
             String education = educationField.getText();
             double fee = consultationFeeSpinner.getValue();
             String specialty = specialtyBox.getSelectionModel().getSelectedItem();
-     
+            
             Integer specId = DatabaseQuery.getSpecialtyIdByName(specialty);
             if (specId == null) specId = sel.getSpecialtyId();
             
@@ -686,6 +685,5 @@ public class ManagerDashboardController {
             } catch (Exception e) {
                 NotificationUtil.showError("Hata", "Müsaitlik eklenirken hata: " + e.getMessage());
             }
-        });    
-    }
+        });    }
 }

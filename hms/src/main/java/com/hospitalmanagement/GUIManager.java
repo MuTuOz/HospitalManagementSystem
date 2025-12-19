@@ -113,6 +113,7 @@ public class GUIManager {
             System.out.println("Tema yüklenemedi: " + e.getMessage());
         }
     }
+
     /**
      * Switch scene based on user role
      */
