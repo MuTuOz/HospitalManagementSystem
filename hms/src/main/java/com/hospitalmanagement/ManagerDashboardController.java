@@ -6,14 +6,16 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.TextArea;
+
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.collections.FXCollections;
 import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Spinner;
+import javafx.stage.Stage;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +27,9 @@ public class ManagerDashboardController {
 
     @FXML
     private Label welcomeLabel;
+
+    @FXML
+    private Label managerNameLabel;
 
     @FXML
     private Label hospitalLabel;
@@ -40,8 +45,24 @@ public class ManagerDashboardController {
 
     @FXML
     private void initialize() {
-        welcomeLabel.setText("Hastane Yönetim Dashboard");
+        var user = Session.getCurrentUser();
+        if (user != null) {
+            if (managerNameLabel != null) {
+                managerNameLabel.setText(user.getName());
+            }
+            // Set hospital name
+            int hospitalId = DatabaseQuery.getHospitalIdByManagerUserId(user.getUserId());
+            if (hospitalId > 0) {
+                Hospital h = DatabaseQuery.getHospitalById(hospitalId);
+                if (h != null && hospitalLabel != null) {
+                    hospitalLabel.setText(h.getName());
+                }
+            }
+        }
         initializeTableColumns();
+        loadStaff();
+        loadAppointments();
+        loadStatistics();
     }
 
     @SuppressWarnings("unchecked")
@@ -68,14 +89,17 @@ public class ManagerDashboardController {
     @FXML
     private void loadStaff() {
         System.out.println("Personel yükleniyor...");
-        var doctors = DatabaseQuery.getAllDoctors();
-        if (doctors.isEmpty()) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Hiç personel bulunamadı.", ButtonType.OK);
-            a.setHeaderText("Personel");
-            a.showAndWait();
+        var user = Session.getCurrentUser();
+        if (user == null) return;
+        
+        int hospitalId = DatabaseQuery.getHospitalIdByManagerUserId(user.getUserId());
+        if (hospitalId <= 0) {
+            // Fallback if no hospital found (shouldn't happen for valid manager)
             return;
         }
-        if (staffTableView != null) {
+
+        var doctors = DatabaseQuery.getDoctorsByHospital(hospitalId);
+        if (staffTableView != null && doctors != null) {
             staffTableView.setItems(FXCollections.observableArrayList(doctors));
         }
     }
@@ -92,46 +116,64 @@ public class ManagerDashboardController {
         var grid = new javafx.scene.layout.GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+        
         var nameField = new TextField();
+        nameField.setPromptText("Örn: Dr. Ahmet Yılmaz");
+        var emailField = new TextField();
+        emailField.setPromptText("Örn: ahmet.yilmaz@hospital.com");
+        var phoneField = new TextField();
+        phoneField.setPromptText("Örn: +90 555 123 4567");
+        var passwordField = new PasswordField();
+        passwordField.setPromptText("En az 8 karakter, büyük/küçük harf ve sayı");
+        var tcField = new TextField();
+        tcField.setPromptText("11 haneli TC kimlik no");
         var licenseField = new TextField();
-        var experienceSpinner = new Spinner<Integer>(0, 100, 0);
+        licenseField.setPromptText("Örn: LIC-123456");
+        var experienceSpinner = new Spinner<Integer>(0, 50, 0);
         var educationField = new TextField();
-        var consultationFeeSpinner = new Spinner<Double>(0.0, 10000.0, 100.0);
+        educationField.setPromptText("Örn: İstanbul Tıp Fakültesi");
+        var consultationFeeSpinner = new Spinner<Double>(0.0, 5000.0, 200.0, 50.0);
+        
         var specialtyBox = new ComboBox<String>();
         List<String> specs = DatabaseQuery.getAllSpecialtyNames();
         specialtyBox.getItems().addAll(specs);
         if (!specs.isEmpty()) specialtyBox.getSelectionModel().select(0);
 
-        grid.add(new javafx.scene.control.Label("Ad:"), 0, 0);
+        grid.add(new javafx.scene.control.Label("Ad Soyad:"), 0, 0);
         grid.add(nameField, 1, 0);
-        grid.add(new javafx.scene.control.Label("Lisans No:"), 0, 1);
-        grid.add(licenseField, 1, 1);
-        grid.add(new javafx.scene.control.Label("Tecrübe (yıl):"), 0, 2);
-        grid.add(experienceSpinner, 1, 2);
-        grid.add(new javafx.scene.control.Label("Eğitim:"), 0, 3);
-        grid.add(educationField, 1, 3);
-        grid.add(new javafx.scene.control.Label("Muayene Ücreti:"), 0, 4);
-        grid.add(consultationFeeSpinner, 1, 4);
-        grid.add(new javafx.scene.control.Label("Uzmanlık:"), 0, 5);
-        grid.add(specialtyBox, 1, 5);
+        grid.add(new javafx.scene.control.Label("E-posta:"), 0, 1);
+        grid.add(emailField, 1, 1);
+        grid.add(new javafx.scene.control.Label("Telefon:"), 0, 2);
+        grid.add(phoneField, 1, 2);
+        grid.add(new javafx.scene.control.Label("TC Kimlik:"), 0, 3);
+        grid.add(tcField, 1, 3);
+        grid.add(new javafx.scene.control.Label("Parola:"), 0, 4);
+        grid.add(passwordField, 1, 4);
+        grid.add(new javafx.scene.control.Label("Lisans No:"), 0, 5);
+        grid.add(licenseField, 1, 5);
+        grid.add(new javafx.scene.control.Label("Tecrübe (yıl):"), 0, 6);
+        grid.add(experienceSpinner, 1, 6);
+        grid.add(new javafx.scene.control.Label("Eğitim:"), 0, 7);
+        grid.add(educationField, 1, 7);
+        grid.add(new javafx.scene.control.Label("Muayene Ücreti:"), 0, 8);
+        grid.add(consultationFeeSpinner, 1, 8);
+        grid.add(new javafx.scene.control.Label("Uzmanlık:"), 0, 9);
+        grid.add(specialtyBox, 1, 9);
 
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.setResultConverter(bt -> bt == ButtonType.OK);
 
         DialogUtil.attachOkValidation(dialog, () -> {
-            String name = nameField.getText();
-            String license = licenseField.getText();
-            int experience = experienceSpinner.getValue();
-            String education = educationField.getText();
-            double fee = consultationFeeSpinner.getValue();
-            String specialty = specialtyBox.getSelectionModel().getSelectedItem();
-            if (!ValidationUtil.validateNotEmpty(name, "Ad")) return false;
-            if (!ValidationUtil.validateLicenseNumber(license)) return false;
-            if (!ValidationUtil.validateInteger(String.valueOf(experience), "Tecrübe", 0, 100)) return false;
-            if (!ValidationUtil.validateNotEmpty(education, "Eğitim")) return false;
-            if (!ValidationUtil.validateDouble(fee, "Muayene Ücreti", 0.0, 10000.0)) return false;
-            if (specialty == null) {
+            if (!ValidationUtil.validateNotEmpty(nameField.getText(), "Ad Soyad")) return false;
+            if (!ValidationUtil.validateEmail(emailField.getText())) return false;
+            if (!ValidationUtil.validatePhone(phoneField.getText())) return false;
+            if (!ValidationUtil.validateNotEmpty(tcField.getText(), "TC Kimlik")) return false;
+            if (!ValidationUtil.validatePassword(passwordField.getText())) return false;
+            if (!ValidationUtil.validateNotEmpty(licenseField.getText(), "Lisans No")) return false;
+            if (!ValidationUtil.validateNotEmpty(educationField.getText(), "Eğitim")) return false;
+            if (specialtyBox.getSelectionModel().getSelectedItem() == null) {
                 ValidationUtil.showError("Uzmanlık seçmelisiniz.");
                 return false;
             }
@@ -140,51 +182,80 @@ public class ManagerDashboardController {
 
         Optional<Boolean> res = dialog.showAndWait();
         if (res.isPresent() && res.get()) {
-            String name = nameField.getText();
-            String license = licenseField.getText();
-            int experience = experienceSpinner.getValue();
-            String education = educationField.getText();
-            double fee = consultationFeeSpinner.getValue();
-            String specialty = specialtyBox.getSelectionModel().getSelectedItem();
-            
-            // Validation
-            if (!ValidationUtil.validateNotEmpty(name, "Ad")) return;
-            if (!ValidationUtil.validateLicenseNumber(license)) return;
-            if (!ValidationUtil.validateInteger(String.valueOf(experience), "Tecrübe", 0, 100)) return;
-            if (!ValidationUtil.validateNotEmpty(education, "Eğitim")) return;
-            if (!ValidationUtil.validateDouble(fee, "Muayene Ücreti", 0.0, 10000.0)) return;
-            if (specialty == null) {
-                ValidationUtil.showError("Uzmanlık seçmelisiniz.");
-                return;
-            }
-            
-            Integer specId = DatabaseQuery.getSpecialtyIdByName(specialty);
-            if (specId == null) specId = 1;
-            boolean ok = DatabaseQuery.createDoctor(0, specId, 0, 0, license, experience, education, fee);
-            if (ok) {
-                Alert a = new Alert(Alert.AlertType.INFORMATION, "Doktor başarıyla oluşturuldu.", ButtonType.OK);
-                a.showAndWait();
-                loadStaff();
-            } else {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Doktor oluşturulamadı.", ButtonType.OK);
-                a.showAndWait();
+            try {
+                var user = Session.getCurrentUser();
+                if (user == null) return;
+                
+                // Get manager's hospital_id from the session or default to 1
+                // Since we don't have getManagerByUserId, we'll use hospital_id = 1 as default
+                int managerHospitalId = 1;
+                
+                // 1. Create User
+                Integer doctorRoleId = DatabaseQuery.getRoleIdByName("Doctor");
+                if (doctorRoleId == null) {
+                    NotificationUtil.showError("Hata", "Doctor rolü bulunamadı.");
+                    return;
+                }
+                
+                int userId = DatabaseQuery.createUserAndReturnId(
+                    nameField.getText(),
+                    emailField.getText(),
+                    passwordField.getText(),
+                    tcField.getText(),
+                    phoneField.getText(),
+                    "",
+                    doctorRoleId
+                );
+                
+                if (userId <= 0) {
+                    NotificationUtil.showError("Hata", "Kullanıcı oluşturulamadı.");
+                    return;
+                }
+                
+                // 2. Create Doctor
+                Integer specialtyId = DatabaseQuery.getSpecialtyIdByName(
+                    specialtyBox.getSelectionModel().getSelectedItem()
+                );
+                
+                boolean created = DatabaseQuery.createDoctor(
+                    userId,
+                    specialtyId != null ? specialtyId : 1,
+                    null,
+                    managerHospitalId,
+                    licenseField.getText(),
+                    experienceSpinner.getValue(),
+                    educationField.getText(),
+                    consultationFeeSpinner.getValue()
+                );
+                
+                if (created) {
+                    NotificationUtil.showInfo("Başarılı", "Doktor başarıyla oluşturuldu.");
+                    loadStaff();
+                } else {
+                    NotificationUtil.showError("Hata", "Doktor kaydı oluşturulamadı.");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                NotificationUtil.showError("Hata", "Doktor oluşturulurken hata: " + e.getMessage());
             }
         }
     }
 
     @FXML
-    private void editDoctor() {
+    private void editStaff() {
         Doctor sel = staffTableView.getSelectionModel().getSelectedItem();
         if (sel == null) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Düzenlemek için bir doktor seçin.", ButtonType.OK);
+            Alert a = new Alert(Alert.AlertType.INFORMATION, "Düzenlemek için bir personel seçin.", ButtonType.OK);
             a.showAndWait();
             return;
         }
         var dialog = new javafx.scene.control.Dialog<Boolean>();
-        dialog.setTitle("Doktor Düzenle");
+        dialog.setTitle("Personel Düzenle");
         var grid = new javafx.scene.layout.GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+        
         var nameLabel = new javafx.scene.control.Label(sel.getName());
         var licenseField = new TextField(sel.getLicenseNo() == null ? "" : sel.getLicenseNo());
         var experienceSpinner = new Spinner<Integer>(0, 100, sel.getExperience());
@@ -236,47 +307,46 @@ public class ManagerDashboardController {
             String education = educationField.getText();
             double fee = consultationFeeSpinner.getValue();
             String specialty = specialtyBox.getSelectionModel().getSelectedItem();
-            
-            // Validation
-            if (!ValidationUtil.validateLicenseNumber(license)) return;
-            if (!ValidationUtil.validateInteger(String.valueOf(experience), "Tecrübe", 0, 100)) return;
-            if (!ValidationUtil.validateNotEmpty(education, "Eğitim")) return;
-            if (!ValidationUtil.validateDouble(fee, "Muayene Ücreti", 0.0, 10000.0)) return;
-            if (specialty == null) {
-                ValidationUtil.showError("Uzmanlık seçmelisiniz.");
-                return;
-            }
-            
+     
             Integer specId = DatabaseQuery.getSpecialtyIdByName(specialty);
             if (specId == null) specId = sel.getSpecialtyId();
             
-            boolean ok = DatabaseQuery.updateDoctor(sel.getDoctorId(), specId, license, experience, education, fee);
-            if (ok) {
-                Alert a = new Alert(Alert.AlertType.INFORMATION, "Doktor başarıyla güncellendi.", ButtonType.OK);
-                a.showAndWait();
+            boolean success = DatabaseQuery.updateDoctor(
+                sel.getDoctorId(),
+                specId,
+                sel.getHospitalId(),
+                license,
+                experience,
+                education,
+                fee
+            );
+            
+            if (success) {
+                NotificationUtil.showInfo("Başarılı", "Personel güncellendi.");
                 loadStaff();
             } else {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Doktor güncellenemedi.", ButtonType.OK);
-                a.showAndWait();
+                NotificationUtil.showError("Hata", "Personel güncellenemedi.");
             }
         }
     }
 
+
+
     @FXML
-    private void deleteDoctor() {
+    private void deleteStaff() {
         Doctor sel = staffTableView.getSelectionModel().getSelectedItem();
         if (sel == null) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Silmek için bir doktor seçin.", ButtonType.OK);
+            Alert a = new Alert(Alert.AlertType.INFORMATION, "Silmek için bir personel seçin.", ButtonType.OK);
             a.showAndWait();
             return;
         }
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Doktoru silmek istediğinize emin misiniz?", ButtonType.YES, ButtonType.NO);
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Personeli silmek istediğinize emin misiniz?", ButtonType.YES, ButtonType.NO);
         var r = confirm.showAndWait();
         if (r.isPresent() && r.get() == ButtonType.YES) {
             boolean ok = DatabaseQuery.deleteDoctor(sel.getDoctorId());
             if (ok) loadStaff();
             else {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Doktor silinemedi.", ButtonType.OK);
+                Alert a = new Alert(Alert.AlertType.ERROR, "Personel silinemedi.", ButtonType.OK);
                 a.showAndWait();
             }
         }
@@ -286,13 +356,7 @@ public class ManagerDashboardController {
     private void loadAppointments() {
         System.out.println("Randevular yükleniyor...");
         var appointments = DatabaseQuery.getAllAppointments();
-        if (appointments.isEmpty()) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION, "Hiç randevu bulunamadı.", ButtonType.OK);
-            a.setHeaderText("Randevular");
-            a.showAndWait();
-            return;
-        }
-        if (appointmentTableView != null) {
+        if (appointmentTableView != null && appointments != null) {
             appointmentTableView.setItems(FXCollections.observableArrayList(appointments));
         }
     }
@@ -336,7 +400,8 @@ public class ManagerDashboardController {
     private void handleLogout() {
         try {
             Session.clear();
-            GUIManager guiManager = new GUIManager(App.getStage());
+            Stage currentStage = (Stage) staffTableView.getScene().getWindow();
+            GUIManager guiManager = new GUIManager(currentStage);
             guiManager.switchToLogin();
         } catch (Exception e) {
             e.printStackTrace();
@@ -370,6 +435,12 @@ public class ManagerDashboardController {
         grid.add(tfNewPassword, 1, 1);
         grid.add(new javafx.scene.control.Label("Yeni Şifre Tekrar:"), 0, 2);
         grid.add(tfConfirm, 1, 2);
+
+        javafx.scene.control.Label lblInfo = new javafx.scene.control.Label("Şifre en az 8 karakter, büyük harf, küçük harf ve sayı içermelidir.");
+        lblInfo.setWrapText(true);
+        lblInfo.setMaxWidth(300);
+        lblInfo.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
+        grid.add(lblInfo, 0, 3, 2, 1);
         
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -403,5 +474,218 @@ public class ManagerDashboardController {
                 NotificationUtil.showError("Hata", "Eski şifre yanlış veya şifre değiştirilemedi.");
             }
         }
+    }
+
+    @FXML
+    private void createAppointment() {
+        try {
+            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("manager_create_appointment.fxml"));
+            javafx.scene.Scene scene = new javafx.scene.Scene(loader.load());
+            javafx.stage.Stage stage = new javafx.stage.Stage();
+            stage.setTitle("Hasta Adına Randevu Oluştur");
+            stage.initOwner(App.getStage());
+            stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            stage.setScene(scene);
+            stage.setResizable(false);
+            stage.showAndWait();
+            refreshAppointments();
+        } catch (Exception e) {
+            e.printStackTrace();
+            NotificationUtil.showError("Hata", "Randevu oluşturma ekranı açılamadı: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void modifyAppointment() {
+        Appointment selected = appointmentTableView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            NotificationUtil.showError("Hata", "Lütfen düzenlemek için bir randevu seçiniz.");
+            return;
+        }
+
+        if (!"scheduled".equalsIgnoreCase(selected.getStatus())) {
+            NotificationUtil.showError("Hata", "Yalnızca 'Planlanmış' durumdaki randevular düzenlenebilir.");
+            return;
+        }
+
+        // Randevu tarihi bugün veya geçmişse "completed" yapılabilir
+        java.time.LocalDate appointmentDate = selected.getAppointmentDate().toLocalDate();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        
+        java.util.List<String> options = new java.util.ArrayList<>();
+        options.add("scheduled");
+        options.add("cancelled");
+        
+        // Bugün veya geçmiş tarihse completed ekle
+        if (!appointmentDate.isAfter(today)) {
+            options.add("completed");
+        }
+        
+        var dialog = new javafx.scene.control.ChoiceDialog<>("scheduled", options);
+        dialog.setTitle("Randevu Durumu Güncelle");
+        dialog.setHeaderText("Randevu #" + selected.getAppointmentId() + " durumunu değiştir");
+        dialog.setContentText("Yeni durum:");
+        
+        var result = dialog.showAndWait();
+        result.ifPresent(status -> {
+            boolean updated = DatabaseQuery.updateAppointmentStatus(selected.getAppointmentId(), status);
+            if (updated) {
+                NotificationUtil.showInfo("Başarı", "Randevu durumu güncellendi.");
+                refreshAppointments();
+            } else {
+                NotificationUtil.showError("Hata", "Randevu güncellenemedi.");
+            }
+        });
+    }
+
+    @FXML
+    private void manageAvailability() {
+        // Doktor seçimi
+        var allDoctors = DatabaseQuery.getAllDoctors();
+        if (allDoctors.isEmpty()) {
+            NotificationUtil.showError("Hata", "Sistemde doktor bulunamadı.");
+            return;
+        }
+        
+        // Custom dialog oluştur
+        var dialog = new javafx.scene.control.Dialog<javafx.util.Pair<Doctor, java.util.Map<String, Object>>>();
+        dialog.setTitle("Müsaitlik Ekle");
+        dialog.setHeaderText("Doktor için yeni müsaitlik zamanı ekleyin");
+        
+        // Dialog buttonları
+        var addButtonType = new javafx.scene.control.ButtonType("Ekle", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButtonType, javafx.scene.control.ButtonType.CANCEL);
+        
+        // Grid layout
+        var grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+        
+        // Doktor Seçimi Bileşenleri
+        var searchField = new javafx.scene.control.TextField();
+        searchField.setPromptText("İsim ile ara...");
+        
+        var doctorCombo = new javafx.scene.control.ComboBox<Doctor>();
+        doctorCombo.setPrefWidth(300);
+        
+        // ComboBox gösterim formatı
+        doctorCombo.setConverter(new javafx.util.StringConverter<Doctor>() {
+            @Override
+            public String toString(Doctor d) {
+                if (d == null) return "";
+                return d.getName() + " (" + d.getSpecialtyName() + ")";
+            }
+            @Override
+            public Doctor fromString(String string) {
+                return null; 
+            }
+        });
+
+        // Filtreleme mantığı
+        javafx.collections.ObservableList<Doctor> observableDoctors = javafx.collections.FXCollections.observableArrayList(allDoctors);
+        javafx.collections.transformation.FilteredList<Doctor> filteredDoctors = new javafx.collections.transformation.FilteredList<>(observableDoctors, p -> true);
+        doctorCombo.setItems(filteredDoctors);
+
+        searchField.textProperty().addListener((obs, oldValue, newValue) -> {
+            filteredDoctors.setPredicate(doctor -> {
+                if (newValue == null || newValue.isEmpty()) {
+                    return true;
+                }
+                String lowerCaseFilter = newValue.toLowerCase();
+                return doctor.getName().toLowerCase().contains(lowerCaseFilter);
+            });
+            doctorCombo.getSelectionModel().selectFirst();
+        });
+
+        // Tablodan seçim varsa otomatik seç
+        if (staffTableView != null) {
+            Doctor selectedInTable = staffTableView.getSelectionModel().getSelectedItem();
+            if (selectedInTable != null) {
+                doctorCombo.getSelectionModel().select(selectedInTable);
+                // Eğer tablodan seçildiyse arama kutusuna da ismini yazabiliriz ama gerek yok, direkt seçili gelsin.
+            } else {
+                doctorCombo.getSelectionModel().selectFirst();
+            }
+        } else {
+            doctorCombo.getSelectionModel().selectFirst();
+        }
+        
+        // DatePicker
+        var datePicker = new javafx.scene.control.DatePicker();
+        datePicker.setValue(java.time.LocalDate.now().plusDays(1));
+        datePicker.setPrefWidth(300);
+        
+        // Saat ComboBox (08:00 - 17:00 arası 15'er dakika)
+        var timeCombo = new javafx.scene.control.ComboBox<String>();
+        for (int hour = 8; hour < 18; hour++) {
+            for (int minute = 0; minute < 60; minute += 15) {
+                timeCombo.getItems().add(String.format("%02d:%02d", hour, minute));
+            }
+        }
+        timeCombo.getSelectionModel().selectFirst();
+        timeCombo.setPrefWidth(300);
+        
+        // Grid'e ekle
+        grid.add(new javafx.scene.control.Label("Doktor Ara:"), 0, 0);
+        grid.add(searchField, 1, 0);
+        grid.add(new javafx.scene.control.Label("Doktor Seç:"), 0, 1);
+        grid.add(doctorCombo, 1, 1);
+        grid.add(new javafx.scene.control.Label("Tarih:"), 0, 2);
+        grid.add(datePicker, 1, 2);
+        grid.add(new javafx.scene.control.Label("Saat:"), 0, 3);
+        grid.add(timeCombo, 1, 3);
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        // Result converter
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == addButtonType) {
+                var map = new java.util.HashMap<String, Object>();
+                map.put("date", datePicker.getValue());
+                map.put("time", timeCombo.getValue());
+                return new javafx.util.Pair<>(doctorCombo.getSelectionModel().getSelectedItem(), map);
+            }
+            return null;
+        });
+        
+        // Dialog göster
+        var result = dialog.showAndWait();
+        
+        result.ifPresent(pair -> {
+            Doctor selectedDoctor = pair.getKey();
+            if (selectedDoctor == null) {
+                 NotificationUtil.showError("Hata", "Lütfen bir doktor seçiniz.");
+                 return;
+            }
+            var data = pair.getValue();
+            java.time.LocalDate selectedDate = (java.time.LocalDate) data.get("date");
+            String selectedTime = (String) data.get("time");
+            
+            // Tarih doğrulama
+            if (selectedDate.isBefore(java.time.LocalDate.now())) {
+                NotificationUtil.showError("Hata", "Geçmiş tarih seçemezsiniz!");
+                return;
+            }
+            
+            try {
+                boolean added = DatabaseQuery.addAvailability(
+                    selectedDoctor.getDoctorId(), 
+                    java.sql.Date.valueOf(selectedDate), 
+                    selectedTime
+                );
+                
+                if (added) {
+                    NotificationUtil.showInfo("Başarı", 
+                        "Dr. " + selectedDoctor.getName() + " için müsaitlik eklendi.\n" +
+                        "Tarih: " + selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + 
+                        "\nSaat: " + selectedTime);
+                } else {
+                    NotificationUtil.showError("Hata", "Müsaitlik eklenemedi. Bu tarih ve saat zaten mevcut olabilir.");
+                }
+            } catch (Exception e) {
+                NotificationUtil.showError("Hata", "Müsaitlik eklenirken hata: " + e.getMessage());
+            }
+        });    
     }
 }
