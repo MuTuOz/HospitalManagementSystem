@@ -12,6 +12,7 @@ public class Doctor {
     private double consultationFee;
     private String name;
     private String specialtyName;
+    private String email;
 
     // Constructor
     public Doctor(int doctorId, int userId, int specialtyId, int clinicId, int hospitalId,
@@ -28,6 +29,25 @@ public class Doctor {
         this.consultationFee = consultationFee;
         this.name = name;
         this.specialtyName = specialtyName;
+        this.email = "";
+    }
+
+    // Extended constructor with email
+    public Doctor(int doctorId, int userId, int specialtyId, int clinicId, int hospitalId,
+                  String licenseNo, int experience, String education, double consultationFee,
+                  String name, String specialtyName, String email) {
+        this.doctorId = doctorId;
+        this.userId = userId;
+        this.specialtyId = specialtyId;
+        this.clinicId = clinicId;
+        this.hospitalId = hospitalId;
+        this.licenseNo = licenseNo;
+        this.experience = experience;
+        this.education = education;
+        this.consultationFee = consultationFee;
+        this.name = name;
+        this.specialtyName = specialtyName;
+        this.email = email;
     }
 
     // Getters and Setters
@@ -63,6 +83,9 @@ public class Doctor {
 
     public String getSpecialtyName() { return specialtyName; }
     public void setSpecialtyName(String specialtyName) { this.specialtyName = specialtyName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
     @Override
     public String toString() {

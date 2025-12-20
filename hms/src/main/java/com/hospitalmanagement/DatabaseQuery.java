@@ -12,14 +12,14 @@ public class DatabaseQuery {
     // Doktor sorgularıfı
     public static List<Doctor> getDoctorsBySpecialty(int specialtyId) {
         List<Doctor> doctors = new ArrayList<>();
-        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d " +
+        String query = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d " +
                 "JOIN User u ON d.user_id = u.user_id " +
                 "JOIN Specialty s ON d.specialty_id = s.specialty_id " +
                 "WHERE d.specialty_id = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
-
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setInt(1, specialtyId);
             ResultSet rs = stmt.executeQuery();
 
@@ -35,9 +35,12 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name"));
+                        rs.getString("specialty_name"),
+                        rs.getString("email"));
                 doctors.add(doctor);
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -122,9 +125,10 @@ public class DatabaseQuery {
     // Tüm doktorları getir (isim + uzmanlık)
     public static List<Doctor> getAllDoctors() {
         List<Doctor> doctors = new ArrayList<>();
-        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id ORDER BY u.name";
-        try (Connection conn = DatabaseConnection.getConnection();
-                Statement stmt = conn.createStatement()) {
+        String query = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id ORDER BY u.name";
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             while (rs.next()) {
                 Doctor doctor = new Doctor(
@@ -138,9 +142,12 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name"));
+                        rs.getString("specialty_name"),
+                        rs.getString("email"));
                 doctors.add(doctor);
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -149,13 +156,14 @@ public class DatabaseQuery {
 
     // Doktoru user_id ile getir
     public static Doctor getDoctorByUserId(int userId) {
-        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.user_id = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
+        String query = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.user_id = ?";
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return new Doctor(
+                Doctor doctor = new Doctor(
                         rs.getInt("doctor_id"),
                         rs.getInt("user_id"),
                         rs.getInt("specialty_id"),
@@ -166,8 +174,14 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name"));
+                        rs.getString("specialty_name"),
+                        rs.getString("email"));
+                rs.close();
+                stmt.close();
+                return doctor;
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -254,9 +268,9 @@ public class DatabaseQuery {
                 "WHERE a.doctor_id = ? AND a.status IN ('scheduled', 'completed') " +
                 "ORDER BY av.date, av.time_slot";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
-
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setInt(1, doctorId);
             ResultSet rs = stmt.executeQuery();
 
@@ -277,6 +291,8 @@ public class DatabaseQuery {
                         rs.getString("patient_name"));
                 appointments.add(appointment);
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -296,9 +312,9 @@ public class DatabaseQuery {
                 "LEFT JOIN Clinic c ON d.clinic_id = c.clinic_id " +
                 "WHERE a.patient_id = ? ORDER BY av.date, av.time_slot";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
-
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setInt(1, patientId);
             ResultSet rs = stmt.executeQuery();
 
@@ -321,6 +337,8 @@ public class DatabaseQuery {
                         rs.getString("clinic_name") != null ? rs.getString("clinic_name") : "");
                 appointments.add(appointment);
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1234,9 +1252,10 @@ public class DatabaseQuery {
     // Get doctors by hospital
     public static List<Doctor> getDoctorsByHospital(int hospitalId) {
         List<Doctor> doctors = new ArrayList<>();
-        String q = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.hospital_id = ? ORDER BY u.name";
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(q)) {
+        String q = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.hospital_id = ? ORDER BY u.name";
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(q);
             stmt.setInt(1, hospitalId);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -1251,8 +1270,11 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name")));
+                        rs.getString("specialty_name"),
+                        rs.getString("email")));
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1262,9 +1284,10 @@ public class DatabaseQuery {
     // Get doctors by specialty and hospital
     public static List<Doctor> getDoctorsBySpecialtyAndHospital(int specialtyId, int hospitalId) {
         List<Doctor> doctors = new ArrayList<>();
-        String q = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.specialty_id = ? AND d.hospital_id = ? ORDER BY u.name";
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(q)) {
+        String q = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d JOIN User u ON d.user_id = u.user_id LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id WHERE d.specialty_id = ? AND d.hospital_id = ? ORDER BY u.name";
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(q);
             stmt.setInt(1, specialtyId);
             stmt.setInt(2, hospitalId);
             ResultSet rs = stmt.executeQuery();
@@ -1280,8 +1303,11 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name")));
+                        rs.getString("specialty_name"),
+                        rs.getString("email")));
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1931,13 +1957,14 @@ public class DatabaseQuery {
     // Get doctors by hospital and specialty name
     public static List<Doctor> getDoctorsByHospitalAndSpecialty(int hospitalId, String specialtyName) {
         List<Doctor> doctors = new ArrayList<>();
-        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d " +
+        String query = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d " +
                 "JOIN User u ON d.user_id = u.user_id " +
                 "JOIN Specialty s ON d.specialty_id = s.specialty_id " +
                 "WHERE d.hospital_id = ? AND s.name = ? ORDER BY u.name";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setInt(1, hospitalId);
             stmt.setString(2, specialtyName);
             ResultSet rs = stmt.executeQuery();
@@ -1954,8 +1981,11 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name")));
+                        rs.getString("specialty_name"),
+                        rs.getString("email")));
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1964,18 +1994,19 @@ public class DatabaseQuery {
 
     // Get doctor by name
     public static Doctor getDoctorByName(String name) {
-        String query = "SELECT d.*, u.name, s.name as specialty_name FROM Doctor d " +
+        String query = "SELECT d.*, u.name, u.email, s.name as specialty_name FROM Doctor d " +
                 "JOIN User u ON d.user_id = u.user_id " +
                 "LEFT JOIN Specialty s ON d.specialty_id = s.specialty_id " +
                 "WHERE u.name = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query)) {
+        try {
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setString(1, name);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
-                return new Doctor(
+                Doctor doctor = new Doctor(
                         rs.getInt("doctor_id"),
                         rs.getInt("user_id"),
                         rs.getInt("specialty_id"),
@@ -1986,8 +2017,14 @@ public class DatabaseQuery {
                         rs.getString("education"),
                         rs.getDouble("consultation_fee"),
                         rs.getString("name"),
-                        rs.getString("specialty_name"));
+                        rs.getString("specialty_name"),
+                        rs.getString("email"));
+                rs.close();
+                stmt.close();
+                return doctor;
             }
+            rs.close();
+            stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
