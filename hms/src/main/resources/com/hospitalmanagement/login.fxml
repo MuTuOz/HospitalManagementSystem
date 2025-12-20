@@ -38,8 +38,8 @@
             <!-- Username Field -->
             <VBox spacing="5">
                <children>
-                  <Label styleClass="label" text="Kullanıcı Adı / E-posta" />
-                  <TextField fx:id="usernameField" prefHeight="45.0" styleClass="input-field" promptText="Kullanıcı adınızı giriniz" />
+                  <Label styleClass="label" text="E-posta" />
+                  <TextField fx:id="usernameField" prefHeight="45.0" styleClass="input-field" promptText="E-posta adresinizi giriniz" />
                </children>
             </VBox>
 
