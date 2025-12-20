@@ -31,6 +31,20 @@ public class AppointmentManager {
     }
     
     /**
+     * Create a new appointment with direct date/time (for doctor-initiated appointments)
+     * @param doctorId Doctor creating the appointment
+     * @param patientId Patient for the appointment
+     * @param appointmentDate Date of the appointment (java.sql.Date)
+     * @param timeSlot Time slot (e.g., "09:00")
+     * @param status Appointment status (e.g., "scheduled")
+     * @param notes Notes for the appointment
+     * @return true if appointment was created successfully
+     */
+    public boolean createAppointment(int doctorId, int patientId, java.sql.Date appointmentDate, String timeSlot, String status, String notes) {
+        return DatabaseQuery.createAppointmentDirect(doctorId, patientId, appointmentDate, timeSlot, status, notes);
+    }
+    
+    /**
      * Delete/cancel an appointment
      */
     public boolean deleteAppointment(int appointmentId, int cancelledByUserId) {

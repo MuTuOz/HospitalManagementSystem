@@ -412,6 +412,167 @@ public class DoctorDashboardController {
     }
 
     @FXML
+    private void handleCreateAppointment() {
+        var user = Session.getCurrentUser();
+        if (user == null) {
+            NotificationUtil.showError("Hata", "Oturum bulunamadı.");
+            return;
+        }
+
+        var doctor = DatabaseQuery.getDoctorByUserId(user.getUserId());
+        if (doctor == null) {
+            NotificationUtil.showError("Hata", "Doktor kaydı bulunamadı.");
+            return;
+        }
+
+        try {
+            // Create a dialog for appointment creation
+            javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
+            dialog.setTitle("Yeni Randevu Oluştur");
+            dialog.setHeaderText("Hasta için yeni randevu oluşturun");
+            
+            // Create dialog content
+            javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+            grid.setPadding(new javafx.geometry.Insets(20));
+            
+            // Patient search field
+            javafx.scene.control.TextField patientSearchField = new javafx.scene.control.TextField();
+            patientSearchField.setPromptText("TC No veya hasta adını girin...");
+            grid.add(new javafx.scene.control.Label("Hasta:"), 0, 0);
+            grid.add(patientSearchField, 1, 0);
+            
+            // Date picker
+            javafx.scene.control.DatePicker datePicker = new javafx.scene.control.DatePicker();
+            datePicker.setValue(java.time.LocalDate.now());
+            grid.add(new javafx.scene.control.Label("Tarih:"), 0, 1);
+            grid.add(datePicker, 1, 1);
+            
+            // Time slot
+            javafx.scene.control.ComboBox<String> timeSlotCombo = new javafx.scene.control.ComboBox<>();
+            timeSlotCombo.setItems(FXCollections.observableArrayList(
+                "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"
+            ));
+            grid.add(new javafx.scene.control.Label("Saat:"), 0, 2);
+            grid.add(timeSlotCombo, 1, 2);
+            
+            // Notes
+            javafx.scene.control.TextArea notesArea = new javafx.scene.control.TextArea();
+            notesArea.setPromptText("Randevu notları (isteğe bağlı)...");
+            notesArea.setPrefRowCount(3);
+            grid.add(new javafx.scene.control.Label("Notlar:"), 0, 3);
+            grid.add(notesArea, 1, 3);
+            
+            // Label for selected patient
+            javafx.scene.control.Label selectedPatientLabel = new javafx.scene.control.Label("Hasta seçilmedi");
+            selectedPatientLabel.setStyle("-fx-text-fill: #666; -fx-font-style: italic;");
+            grid.add(selectedPatientLabel, 1, 4);
+            
+            // Store selected patient ID
+            final int[] selectedPatientId = {-1};
+            
+            // Patient search button
+            javafx.scene.control.Button searchButton = new javafx.scene.control.Button("Hasta Ara");
+            searchButton.setOnAction(e -> {
+                String searchTerm = patientSearchField.getText().trim();
+                if (searchTerm.isEmpty()) {
+                    NotificationUtil.showError("Hata", "Lütfen TC No veya hasta adı girin.");
+                    return;
+                }
+                
+                // Search patient
+                Patient patient = null;
+                User userByTc = DatabaseQuery.getUserByTcNo(searchTerm);
+                if (userByTc != null) {
+                    patient = DatabaseQuery.getPatientByUserId(userByTc.getUserId());
+                }
+                
+                if (patient == null) {
+                    java.util.List<Patient> patients = DatabaseQuery.searchPatientsByName(searchTerm);
+                    if (patients.isEmpty()) {
+                        NotificationUtil.showError("Bulunamadı", "Bu TC veya isme sahip hasta bulunamadı.");
+                        return;
+                    } else if (patients.size() == 1) {
+                        patient = patients.get(0);
+                    } else {
+                        // Show selection dialog for multiple results
+                        var patientOptions = patients.stream().map(p -> p.getName() + " (" + p.getEmail() + ")").collect(java.util.stream.Collectors.toList());
+                        var selectionDialog = new javafx.scene.control.ChoiceDialog<>(patientOptions.get(0), patientOptions);
+                        selectionDialog.setTitle("Hasta Seçim");
+                        selectionDialog.setHeaderText("Birden fazla hasta bulundu");
+                        selectionDialog.setContentText("Hastayı seçin:");
+                        
+                        var result = selectionDialog.showAndWait();
+                        if (result.isPresent()) {
+                            int selectedIndex = patientOptions.indexOf(result.get());
+                            patient = patients.get(selectedIndex);
+                        } else {
+                            return;
+                        }
+                    }
+                }
+                
+                if (patient != null) {
+                    selectedPatientId[0] = patient.getPatientId();
+                    selectedPatientLabel.setText(patient.getName() + " (" + patient.getEmail() + ")");
+                }
+            });
+            
+            javafx.scene.layout.HBox searchBox = new javafx.scene.layout.HBox(10);
+            searchBox.getChildren().addAll(patientSearchField, searchButton);
+            grid.add(searchBox, 1, 0);
+            grid.getChildren().remove(patientSearchField);
+            
+            dialog.getDialogPane().setContent(grid);
+            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            
+            // Handle OK button
+            var result = dialog.showAndWait();
+            result.ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    if (selectedPatientId[0] == -1) {
+                        NotificationUtil.showError("Hata", "Lütfen bir hasta seçin.");
+                        return;
+                    }
+                    if (datePicker.getValue() == null) {
+                        NotificationUtil.showError("Hata", "Lütfen bir tarih seçin.");
+                        return;
+                    }
+                    if (timeSlotCombo.getValue() == null) {
+                        NotificationUtil.showError("Hata", "Lütfen bir saat seçin.");
+                        return;
+                    }
+                    
+                    // Create appointment
+                    java.sql.Date appointmentDate = java.sql.Date.valueOf(datePicker.getValue());
+                    String timeSlot = timeSlotCombo.getValue();
+                    String notes = notesArea.getText().trim();
+                    
+                    boolean created = appointmentManager.createAppointment(
+                        doctor.getDoctorId(),
+                        selectedPatientId[0],
+                        appointmentDate,
+                        timeSlot,
+                        "scheduled",
+                        notes.isEmpty() ? null : notes
+                    );
+                    
+                    if (created) {
+                        NotificationUtil.showInfo("Başarılı", "Randevu başarıyla oluşturuldu.");
+                        loadAppointments();
+                    } else {
+                        NotificationUtil.showError("Hata", "Randevu oluşturulamadı. Lütfen tekrar deneyin.");
+                    }
+                }
+            });
+        } catch (Exception e) {
+            NotificationUtil.showError("Hata", "Randevu oluşturulurken bir hata oluştu: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
     private void completeAppointment() {
         var user = Session.getCurrentUser();
         if (user == null) {

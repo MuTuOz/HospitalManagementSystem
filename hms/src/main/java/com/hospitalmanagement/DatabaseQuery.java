@@ -461,6 +461,91 @@ public class DatabaseQuery {
         return false;
     }
 
+    /**
+     * Create an appointment directly with date and time (for doctor-initiated appointments)
+     * Creates both an Availability slot and Appointment in the system
+     */
+    public static boolean createAppointmentDirect(int doctorId, int patientId, java.sql.Date appointmentDate, String timeSlot, String status, String notes) {
+        // First, get doctor's hospital_id
+        String getDoctorHospital = "SELECT hospital_id FROM Doctor WHERE doctor_id = ?";
+        int hospitalId = -1;
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(getDoctorHospital)) {
+            stmt.setInt(1, doctorId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                hospitalId = rs.getInt("hospital_id");
+            }
+            rs.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        if (hospitalId == -1) {
+            return false;
+        }
+        
+        // Create availability slot first
+        String createAvailability = "INSERT INTO Availability (doctor_id, date, time_slot, is_booked) VALUES (?,?,?,TRUE)";
+        int availabilityId = -1;
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(createAvailability, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setInt(1, doctorId);
+            stmt.setDate(2, appointmentDate);
+            stmt.setString(3, timeSlot);
+            
+            int rows = stmt.executeUpdate();
+            if (rows > 0) {
+                ResultSet rs = stmt.getGeneratedKeys();
+                if (rs.next()) {
+                    availabilityId = rs.getInt(1);
+                }
+                rs.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        if (availabilityId == -1) {
+            return false;
+        }
+        
+        // Now create the appointment
+        String createAppointment = "INSERT INTO Appointment (doctor_id, patient_id, availability_id, hospital_id, status, notes) VALUES (?,?,?,?,?,?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(createAppointment)) {
+            stmt.setInt(1, doctorId);
+            stmt.setInt(2, patientId);
+            stmt.setInt(3, availabilityId);
+            stmt.setInt(4, hospitalId);
+            stmt.setString(5, status == null ? "scheduled" : status);
+            stmt.setString(6, notes == null ? "" : notes);
+            
+            int rows = stmt.executeUpdate();
+            
+            if (rows > 0) {
+                // Log activity for both doctor and patient
+                try {
+                    logUserActivity(patientId, "AppointmentCreated", "DoctorId=" + doctorId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
+                } catch (Exception ignored) {
+                }
+                try {
+                    logUserActivity(doctorId, "AppointmentCreatedForPatient", "PatientId=" + patientId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
+                } catch (Exception ignored) {
+                }
+            }
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     // Tarihi geçmiş randevuları 'Completed' olarak işaretle (gün bazında)
     public static int markPastAppointmentsCompleted() {
         String update = "UPDATE Appointment a JOIN Availability av ON a.availability_id = av.availability_id " +
@@ -1099,7 +1184,7 @@ public class DatabaseQuery {
 
     public static void logUserActivity(int userId, String action, String details) {
         ensureUserActivityTable();
-        String insert = "INSERT INTO User_Activity (user_id, action, details) VALUES (?,?,?)";
+        String insert = "INSERT INTO User_Activity (user_id, activity_type, description) VALUES (?,?,?)";
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(insert)) {
             stmt.setInt(1, userId);
@@ -2104,6 +2189,7 @@ public class DatabaseQuery {
         }
         return slots;
     }
+
 
     // Get user by TC number
     public static User getUserByTcNo(String tcNo) {

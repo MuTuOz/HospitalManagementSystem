@@ -43,6 +43,7 @@
                                         <Label text="📋 Mevcut Randevularım" style="-fx-font-size:18px; -fx-font-weight:bold; -fx-text-fill:#00b3a6;" />
                                         <HBox spacing="12">
                                             <children>
+                                                <Button mnemonicParsing="false" onAction="#handleCreateAppointment" text="➕ Yeni Randevu Oluştur" prefHeight="40" prefWidth="200" style="-fx-font-size:13px; -fx-font-weight:bold; -fx-background-radius:8;" styleClass="btn-primary" />
                                                 <Button mnemonicParsing="false" onAction="#completeAppointment" text="✅ Randevuyu Tamamla" prefHeight="40" prefWidth="200" style="-fx-font-size:13px; -fx-font-weight:bold; -fx-background-radius:8;" styleClass="btn-secondary" />
                                                 <Button mnemonicParsing="false" onAction="#refreshAppointments" text="🔄 Yenile" prefHeight="40" prefWidth="100" style="-fx-font-size:13px;" styleClass="btn-secondary" />
                                             </children>
