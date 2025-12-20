@@ -287,10 +287,13 @@ public class DatabaseQuery {
     // Hastanın randevularını getir
     public static List<Appointment> getAppointmentsByPatientId(int patientId) {
         List<Appointment> appointments = new ArrayList<>();
-        String query = "SELECT a.*, av.date, av.time_slot, u.name as doctor_name FROM Appointment a " +
+        String query = "SELECT a.*, av.date, av.time_slot, u.name as doctor_name, h.name as hospital_name, " +
+                "c.clinic_name FROM Appointment a " +
                 "JOIN Availability av ON a.availability_id = av.availability_id " +
                 "JOIN Doctor d ON a.doctor_id = d.doctor_id " +
                 "JOIN User u ON d.user_id = u.user_id " +
+                "LEFT JOIN Hospital h ON a.hospital_id = h.hospital_id " +
+                "LEFT JOIN Clinic c ON d.clinic_id = c.clinic_id " +
                 "WHERE a.patient_id = ? ORDER BY av.date, av.time_slot";
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -313,7 +316,9 @@ public class DatabaseQuery {
                         rs.getDate("date"),
                         rs.getString("time_slot"),
                         rs.getString("doctor_name"),
-                        patientId + "");
+                        patientId + "",
+                        rs.getString("hospital_name") != null ? rs.getString("hospital_name") : "",
+                        rs.getString("clinic_name") != null ? rs.getString("clinic_name") : "");
                 appointments.add(appointment);
             }
         } catch (SQLException e) {

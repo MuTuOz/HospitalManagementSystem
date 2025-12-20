@@ -16,6 +16,8 @@ public class Appointment {
     private String timeSlot;
     private String doctorName;
     private String patientName;
+    private String hospitalName;
+    private String clinicName;
 
     // Constructor
     public Appointment(int appointmentId, int doctorId, int patientId, int availabilityId,
@@ -35,6 +37,30 @@ public class Appointment {
         this.timeSlot = timeSlot;
         this.doctorName = doctorName;
         this.patientName = patientName;
+        this.hospitalName = "";
+        this.clinicName = "";
+    }
+
+    // Extended constructor with hospital and clinic names
+    public Appointment(int appointmentId, int doctorId, int patientId, int availabilityId,
+                      int hospitalId, String status, String notes, String diagnosis,
+                      String prescription, Date appointmentDate, String timeSlot,
+                      String doctorName, String patientName, String hospitalName, String clinicName) {
+        this.appointmentId = appointmentId;
+        this.doctorId = doctorId;
+        this.patientId = patientId;
+        this.availabilityId = availabilityId;
+        this.hospitalId = hospitalId;
+        this.status = status;
+        this.notes = notes;
+        this.diagnosis = diagnosis;
+        this.prescription = prescription;
+        this.appointmentDate = appointmentDate;
+        this.timeSlot = timeSlot;
+        this.doctorName = doctorName;
+        this.patientName = patientName;
+        this.hospitalName = hospitalName;
+        this.clinicName = clinicName;
     }
 
     // Getters and Setters
@@ -76,6 +102,12 @@ public class Appointment {
 
     public String getPatientName() { return patientName; }
     public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public String getHospitalName() { return hospitalName; }
+    public void setHospitalName(String hospitalName) { this.hospitalName = hospitalName; }
+
+    public String getClinicName() { return clinicName; }
+    public void setClinicName(String clinicName) { this.clinicName = clinicName; }
 
     @Override
     public String toString() {

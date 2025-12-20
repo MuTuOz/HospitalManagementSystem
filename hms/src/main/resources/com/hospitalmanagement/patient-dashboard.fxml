@@ -51,6 +51,25 @@
             <VBox spacing="12" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS" style="-fx-background-color:white; -fx-background-radius:12; -fx-padding:20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);">
                <children>
                   <Label text="Randevularım" style="-fx-font-size:18px; -fx-font-weight:bold; -fx-text-fill:#00b3a6;" />
+                  <HBox spacing="15" alignment="CENTER_LEFT" style="-fx-padding:10; -fx-background-color:#f9f9f9; -fx-border-radius:8; -fx-border-color:#e0e0e0;">
+                     <children>
+                        <Label text="Filtrele:" style="-fx-font-size:13px; -fx-font-weight:bold; -fx-text-fill:#333;" />
+                        <Label text="Doktor:" style="-fx-font-size:12px; -fx-text-fill:#666;" />
+                        <ComboBox fx:id="doctorFilterCombo" prefWidth="180" style="-fx-font-size:12px;">
+                           <items />
+                        </ComboBox>
+                        <Label text="Hastane:" style="-fx-font-size:12px; -fx-text-fill:#666;" />
+                        <ComboBox fx:id="hospitalFilterCombo" prefWidth="180" style="-fx-font-size:12px;">
+                           <items />
+                        </ComboBox>
+                        <Label text="Klinik:" style="-fx-font-size:12px; -fx-text-fill:#666;" />
+                        <ComboBox fx:id="clinicFilterCombo" prefWidth="180" style="-fx-font-size:12px;">
+                           <items />
+                        </ComboBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button text="Filtreleri Temizle" onAction="#handleClearFilters" prefHeight="35" prefWidth="140" style="-fx-font-size:12px; -fx-background-radius:6;" styleClass="btn-secondary" />
+                     </children>
+                  </HBox>
                   <TableView fx:id="appointmentsTable" prefHeight="300.0" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS" style="-fx-font-size:14px; -fx-border-color:#e0e0e0; -fx-border-radius:8; -fx-background-radius:8;">
                      <columns>
                         <TableColumn text="ID" prefWidth="60" style="-fx-font-size:14px;" />

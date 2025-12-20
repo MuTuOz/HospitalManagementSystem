@@ -7,17 +7,18 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.stage.Stage;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.collections.FXCollections;
 
 import java.util.List;
+import java.util.ArrayList;
 
 public class PatientDashboardController {
 
@@ -39,6 +40,18 @@ public class PatientDashboardController {
     private TableView<Appointment> appointmentsTable;
 
     @FXML
+    private ComboBox<String> doctorFilterCombo;
+
+    @FXML
+    private ComboBox<String> hospitalFilterCombo;
+
+    @FXML
+    private ComboBox<String> clinicFilterCombo;
+
+    // Store all appointments for filtering
+    private List<Appointment> allAppointments = new ArrayList<>();
+
+    @FXML
     private void initialize() {
         // Oturum açıldığında geçmiş randevuları güncelle
         try {
@@ -51,6 +64,8 @@ public class PatientDashboardController {
         }
 
         setupAppointmentTableColumns();
+        setupFilterListeners();
+        
         var user = Session.getCurrentUser();
         if (user != null) {
             // Sadece ismi göster
@@ -70,6 +85,18 @@ public class PatientDashboardController {
                 lblPhone.setText(user.getPhone());
                 lblInsurance.setText("-");
             }
+        }
+    }
+
+    private void setupFilterListeners() {
+        if (doctorFilterCombo != null) {
+            doctorFilterCombo.setOnAction(e -> applyFilters());
+        }
+        if (hospitalFilterCombo != null) {
+            hospitalFilterCombo.setOnAction(e -> applyFilters());
+        }
+        if (clinicFilterCombo != null) {
+            clinicFilterCombo.setOnAction(e -> applyFilters());
         }
     }
 
@@ -104,13 +131,71 @@ public class PatientDashboardController {
             return;
         }
         System.out.println("Patient ID: " + patient.getPatientId());
-        List<Appointment> appts = appointmentManager.viewAppointmentsByPatient(patient.getPatientId());
-        System.out.println("Bulunan randevu sayısı: " + appts.size());
+        allAppointments = appointmentManager.viewAppointmentsByPatient(patient.getPatientId());
+        System.out.println("Bulunan randevu sayısı: " + allAppointments.size());
+        
         if (appointmentsTable != null) {
-            appointmentsTable.setItems(FXCollections.observableArrayList(appts));
+            appointmentsTable.setItems(FXCollections.observableArrayList(allAppointments));
             System.out.println("Tablo güncellendi");
+            
+            // Populate filter dropdowns
+            populateFilterDropdowns();
         } else {
             System.out.println("appointmentsTable null!");
+        }
+    }
+
+    private void populateFilterDropdowns() {
+        // Populate doctor filter
+        if (doctorFilterCombo != null) {
+            List<String> doctors = appointmentManager.getUniqueDoctorNames(allAppointments);
+            doctors.add(0, "Tüm Doktorlar");
+            doctorFilterCombo.setItems(FXCollections.observableArrayList(doctors));
+            doctorFilterCombo.setValue("Tüm Doktorlar");
+        }
+
+        // Populate hospital filter
+        if (hospitalFilterCombo != null) {
+            List<String> hospitals = appointmentManager.getUniqueHospitalNames(allAppointments);
+            hospitals.add(0, "Tüm Hastaneler");
+            hospitalFilterCombo.setItems(FXCollections.observableArrayList(hospitals));
+            hospitalFilterCombo.setValue("Tüm Hastaneler");
+        }
+
+        // Populate clinic filter
+        if (clinicFilterCombo != null) {
+            List<String> clinics = appointmentManager.getUniquClinicNames(allAppointments);
+            clinics.add(0, "Tüm Klinikler");
+            clinicFilterCombo.setItems(FXCollections.observableArrayList(clinics));
+            clinicFilterCombo.setValue("Tüm Klinikler");
+        }
+    }
+
+    private void applyFilters() {
+        String selectedDoctor = doctorFilterCombo != null ? doctorFilterCombo.getValue() : null;
+        String selectedHospital = hospitalFilterCombo != null ? hospitalFilterCombo.getValue() : null;
+        String selectedClinic = clinicFilterCombo != null ? clinicFilterCombo.getValue() : null;
+
+        List<Appointment> filteredAppointments = new ArrayList<>(allAppointments);
+
+        // Apply doctor filter
+        if (selectedDoctor != null && !selectedDoctor.equals("Tüm Doktorlar")) {
+            filteredAppointments = appointmentManager.filterByDoctor(filteredAppointments, selectedDoctor);
+        }
+
+        // Apply hospital filter
+        if (selectedHospital != null && !selectedHospital.equals("Tüm Hastaneler")) {
+            filteredAppointments = appointmentManager.filterByHospital(filteredAppointments, selectedHospital);
+        }
+
+        // Apply clinic filter
+        if (selectedClinic != null && !selectedClinic.equals("Tüm Klinikler")) {
+            filteredAppointments = appointmentManager.filterByClinic(filteredAppointments, selectedClinic);
+        }
+
+        // Update table
+        if (appointmentsTable != null) {
+            appointmentsTable.setItems(FXCollections.observableArrayList(filteredAppointments));
         }
     }
 
@@ -124,6 +209,22 @@ public class PatientDashboardController {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @FXML
+    private void handleClearFilters() {
+        System.out.println("=== FİLTRELERİ TEMIZLE ===");
+        if (doctorFilterCombo != null) {
+            doctorFilterCombo.setValue("Tüm Doktorlar");
+        }
+        if (hospitalFilterCombo != null) {
+            hospitalFilterCombo.setValue("Tüm Hastaneler");
+        }
+        if (clinicFilterCombo != null) {
+            clinicFilterCombo.setValue("Tüm Klinikler");
+        }
+        applyFilters();
+        NotificationUtil.showInfo("Başarılı", "Tüm filtreler temizlendi.");
     }
 
     @FXML

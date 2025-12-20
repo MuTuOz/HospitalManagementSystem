@@ -3,6 +3,7 @@ package com.hospitalmanagement.service;
 import com.hospitalmanagement.Appointment;
 import com.hospitalmanagement.DatabaseQuery;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * AppointmentManager - Service layer for appointment operations.
@@ -74,5 +75,76 @@ public class AppointmentManager {
      */
     public AvailabilityService getAvailabilityService() {
         return availabilityService;
+    }
+
+    /**
+     * Filter appointments by doctor name
+     */
+    public List<Appointment> filterByDoctor(List<Appointment> appointments, String doctorName) {
+        if (doctorName == null || doctorName.isEmpty()) {
+            return appointments;
+        }
+        return appointments.stream()
+                .filter(a -> a.getDoctorName().equalsIgnoreCase(doctorName))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Filter appointments by hospital name
+     */
+    public List<Appointment> filterByHospital(List<Appointment> appointments, String hospitalName) {
+        if (hospitalName == null || hospitalName.isEmpty()) {
+            return appointments;
+        }
+        return appointments.stream()
+                .filter(a -> a.getHospitalName() != null && a.getHospitalName().equalsIgnoreCase(hospitalName))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Filter appointments by clinic name
+     */
+    public List<Appointment> filterByClinic(List<Appointment> appointments, String clinicName) {
+        if (clinicName == null || clinicName.isEmpty()) {
+            return appointments;
+        }
+        return appointments.stream()
+                .filter(a -> a.getClinicName() != null && a.getClinicName().equalsIgnoreCase(clinicName))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all unique doctor names from appointments
+     */
+    public List<String> getUniqueDoctorNames(List<Appointment> appointments) {
+        return appointments.stream()
+                .map(Appointment::getDoctorName)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all unique hospital names from appointments
+     */
+    public List<String> getUniqueHospitalNames(List<Appointment> appointments) {
+        return appointments.stream()
+                .map(Appointment::getHospitalName)
+                .filter(name -> name != null && !name.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all unique clinic names from appointments
+     */
+    public List<String> getUniquClinicNames(List<Appointment> appointments) {
+        return appointments.stream()
+                .map(Appointment::getClinicName)
+                .filter(name -> name != null && !name.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 }
