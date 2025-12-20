@@ -487,62 +487,136 @@ public class DatabaseQuery {
             return false;
         }
         
-        // Create availability slot first
-        String createAvailability = "INSERT INTO Availability (doctor_id, date, time_slot, is_booked) VALUES (?,?,?,TRUE)";
         int availabilityId = -1;
         
+        // Check if availability already exists
+        String checkAvailability = "SELECT availability_id, is_booked FROM Availability WHERE doctor_id = ? AND date = ? AND time_slot = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(createAvailability, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(checkAvailability)) {
             stmt.setInt(1, doctorId);
             stmt.setDate(2, appointmentDate);
             stmt.setString(3, timeSlot);
-            
-            int rows = stmt.executeUpdate();
-            if (rows > 0) {
-                ResultSet rs = stmt.getGeneratedKeys();
-                if (rs.next()) {
-                    availabilityId = rs.getInt(1);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                boolean isBooked = rs.getBoolean("is_booked");
+                if (isBooked) {
+                    // Slot is already booked
+                    return false;
                 }
-                rs.close();
+                availabilityId = rs.getInt("availability_id");
+                
+                // Mark as booked
+                String updateAvailability = "UPDATE Availability SET is_booked = TRUE WHERE availability_id = ?";
+                try (PreparedStatement updateStmt = conn.prepareStatement(updateAvailability)) {
+                    updateStmt.setInt(1, availabilityId);
+                    updateStmt.executeUpdate();
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+        
+        // If not exists, create it
+        if (availabilityId == -1) {
+            String createAvailability = "INSERT INTO Availability (doctor_id, date, time_slot, is_booked) VALUES (?,?,?,TRUE)";
+            
+            try (Connection conn = DatabaseConnection.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(createAvailability, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                stmt.setInt(1, doctorId);
+                stmt.setDate(2, appointmentDate);
+                stmt.setString(3, timeSlot);
+                
+                int rows = stmt.executeUpdate();
+                if (rows > 0) {
+                    ResultSet rs = stmt.getGeneratedKeys();
+                    if (rs.next()) {
+                        availabilityId = rs.getInt(1);
+                    }
+                    rs.close();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
         }
         
         if (availabilityId == -1) {
             return false;
         }
         
-        // Now create the appointment
-        String createAppointment = "INSERT INTO Appointment (doctor_id, patient_id, availability_id, hospital_id, status, notes) VALUES (?,?,?,?,?,?)";
-        
+        // Check if there is an existing appointment for this availability (e.g. cancelled)
+        String checkAppointment = "SELECT appointment_id FROM Appointment WHERE availability_id = ?";
+        int existingAppointmentId = -1;
         try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(createAppointment)) {
-            stmt.setInt(1, doctorId);
-            stmt.setInt(2, patientId);
-            stmt.setInt(3, availabilityId);
-            stmt.setInt(4, hospitalId);
-            stmt.setString(5, status == null ? "scheduled" : status);
-            stmt.setString(6, notes == null ? "" : notes);
-            
-            int rows = stmt.executeUpdate();
-            
-            if (rows > 0) {
-                // Log activity for both doctor and patient
-                try {
-                    logUserActivity(patientId, "AppointmentCreated", "DoctorId=" + doctorId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
-                } catch (Exception ignored) {
-                }
-                try {
-                    logUserActivity(doctorId, "AppointmentCreatedForPatient", "PatientId=" + patientId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
-                } catch (Exception ignored) {
-                }
+             PreparedStatement stmt = conn.prepareStatement(checkAppointment)) {
+            stmt.setInt(1, availabilityId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                existingAppointmentId = rs.getInt("appointment_id");
             }
-            return rows > 0;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+
+        if (existingAppointmentId != -1) {
+             // Update existing appointment
+             String updateAppointment = "UPDATE Appointment SET patient_id = ?, hospital_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE appointment_id = ?";
+             try (Connection conn = DatabaseConnection.getConnection();
+                  PreparedStatement stmt = conn.prepareStatement(updateAppointment)) {
+                 stmt.setInt(1, patientId);
+                 stmt.setInt(2, hospitalId);
+                 stmt.setString(3, status == null ? "scheduled" : status);
+                 stmt.setString(4, notes == null ? "" : notes);
+                 stmt.setInt(5, existingAppointmentId);
+                 
+                 int rows = stmt.executeUpdate();
+                 if (rows > 0) {
+                     // Log activity
+                     try {
+                         logUserActivity(patientId, "AppointmentCreated", "DoctorId=" + doctorId + ", Date=" + appointmentDate + ", Time=" + timeSlot + " (Reused ApptId=" + existingAppointmentId + ")");
+                     } catch (Exception ignored) {}
+                     try {
+                         logUserActivity(doctorId, "AppointmentCreatedForPatient", "PatientId=" + patientId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
+                     } catch (Exception ignored) {}
+                 }
+                 return rows > 0;
+             } catch (SQLException e) {
+                 e.printStackTrace();
+                 return false;
+             }
+        } else {
+            // Create new appointment
+            String createAppointment = "INSERT INTO Appointment (doctor_id, patient_id, availability_id, hospital_id, status, notes) VALUES (?,?,?,?,?,?)";
+            
+            try (Connection conn = DatabaseConnection.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(createAppointment)) {
+                stmt.setInt(1, doctorId);
+                stmt.setInt(2, patientId);
+                stmt.setInt(3, availabilityId);
+                stmt.setInt(4, hospitalId);
+                stmt.setString(5, status == null ? "scheduled" : status);
+                stmt.setString(6, notes == null ? "" : notes);
+                
+                int rows = stmt.executeUpdate();
+                
+                if (rows > 0) {
+                    // Log activity for both doctor and patient
+                    try {
+                        logUserActivity(patientId, "AppointmentCreated", "DoctorId=" + doctorId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
+                    } catch (Exception ignored) {
+                    }
+                    try {
+                        logUserActivity(doctorId, "AppointmentCreatedForPatient", "PatientId=" + patientId + ", Date=" + appointmentDate + ", Time=" + timeSlot);
+                    } catch (Exception ignored) {
+                    }
+                }
+                return rows > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
         }
     }
 
