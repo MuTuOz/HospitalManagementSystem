@@ -21,9 +21,6 @@
                            <image>
                               <Image url="@alplogo.png" />
                            </image>
-                           <effect>
-                              <javafx.scene.effect.DropShadow color="rgba(0,0,0,0.1)" radius="10" />
-                           </effect>
                         </ImageView>
                      </children>
                   </VBox>
