@@ -32,7 +32,7 @@
                     <Separator/>
                     <VBox spacing="10">
                         <HBox spacing="10" alignment="CENTER_LEFT">
-                             <TextField fx:id="patientSearchField" promptText="TC No veya hasta adı" HBox.hgrow="ALWAYS" prefHeight="35" style="-fx-font-size: 13px;"/>
+                             <TextField fx:id="patientSearchField" promptText="Hasta adı" HBox.hgrow="ALWAYS" prefHeight="35" style="-fx-font-size: 13px;"/>
                              <Button text="🔍 Ara" onAction="#searchPatient" prefHeight="35" style="-fx-padding: 5 15; -fx-font-size: 13px;" styleClass="btn-secondary"/>
                         </HBox>
                         <HBox spacing="10" alignment="CENTER_LEFT">
