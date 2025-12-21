@@ -125,8 +125,8 @@ public class ManagerDashboardController {
         phoneField.setPromptText("Örn: +90 555 123 4567");
         var passwordField = new PasswordField();
         passwordField.setPromptText("En az 8 karakter, büyük/küçük harf ve sayı");
-        var tcField = new TextField();
-        tcField.setPromptText("11 haneli TC kimlik no");
+        // var tcField = new TextField();
+        // tcField.setPromptText("11 haneli TC kimlik no");
         var licenseField = new TextField();
         licenseField.setPromptText("Örn: LIC-123456");
         var experienceSpinner = new Spinner<Integer>(0, 50, 0);
@@ -145,8 +145,9 @@ public class ManagerDashboardController {
         grid.add(emailField, 1, 1);
         grid.add(new javafx.scene.control.Label("Telefon:"), 0, 2);
         grid.add(phoneField, 1, 2);
-        grid.add(new javafx.scene.control.Label("TC Kimlik:"), 0, 3);
-        grid.add(tcField, 1, 3);
+        // TC Kimlik removed
+        // grid.add(new javafx.scene.control.Label("TC Kimlik:"), 0, 3);
+        // grid.add(tcField, 1, 3);
         grid.add(new javafx.scene.control.Label("Parola:"), 0, 4);
         grid.add(passwordField, 1, 4);
         grid.add(new javafx.scene.control.Label("Lisans No:"), 0, 5);
@@ -168,7 +169,7 @@ public class ManagerDashboardController {
             if (!ValidationUtil.validateNotEmpty(nameField.getText(), "Ad Soyad")) return false;
             if (!ValidationUtil.validateEmail(emailField.getText())) return false;
             if (!ValidationUtil.validatePhone(phoneField.getText())) return false;
-            if (!ValidationUtil.validateNotEmpty(tcField.getText(), "TC Kimlik")) return false;
+            // if (!ValidationUtil.validateNotEmpty(tcField.getText(), "TC Kimlik")) return false;
             if (!ValidationUtil.validatePassword(passwordField.getText())) return false;
             if (!ValidationUtil.validateNotEmpty(licenseField.getText(), "Lisans No")) return false;
             if (!ValidationUtil.validateNotEmpty(educationField.getText(), "Eğitim")) return false;
@@ -200,7 +201,7 @@ public class ManagerDashboardController {
                     nameField.getText(),
                     emailField.getText(),
                     passwordField.getText(),
-                    tcField.getText(),
+                    null, // TC No removed
                     phoneField.getText(),
                     "",
                     doctorRoleId
