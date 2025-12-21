@@ -765,16 +765,17 @@ public class DatabaseQuery {
             return -1;
         }
 
-        String insert = "INSERT INTO User (name, email, password, tc_no, phone, address, role_id) VALUES (?,?,?,?,?,?,?)";
+        // TC No removed from schema, so we ignore the tcNo parameter and insert without it
+        String insertNoTc = "INSERT INTO User (name, email, password, phone, address, role_id) VALUES (?,?,?,?,?,?)";
         try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(insert, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement stmt = conn.prepareStatement(insertNoTc,
+                        java.sql.Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, name);
             stmt.setString(2, email);
             stmt.setString(3, hashedPassword);
-            stmt.setString(4, tcNo);
-            stmt.setString(5, phone);
-            stmt.setString(6, address);
-            stmt.setInt(7, roleId);
+            stmt.setString(4, phone);
+            stmt.setString(5, address);
+            stmt.setInt(6, roleId);
             int rows = stmt.executeUpdate();
             if (rows > 0) {
                 ResultSet keys = stmt.getGeneratedKeys();
@@ -783,31 +784,7 @@ public class DatabaseQuery {
                 }
             }
         } catch (SQLException e) {
-            // If tc_no column is missing, try without it
-            if (e.getMessage().contains("Unknown column 'tc_no'")) {
-                String insertNoTc = "INSERT INTO User (name, email, password, phone, address, role_id) VALUES (?,?,?,?,?,?)";
-                try (Connection conn = DatabaseConnection.getConnection();
-                        PreparedStatement stmt = conn.prepareStatement(insertNoTc,
-                                java.sql.Statement.RETURN_GENERATED_KEYS)) {
-                    stmt.setString(1, name);
-                    stmt.setString(2, email);
-                    stmt.setString(3, hashedPassword);
-                    stmt.setString(4, phone);
-                    stmt.setString(5, address);
-                    stmt.setInt(6, roleId);
-                    int rows = stmt.executeUpdate();
-                    if (rows > 0) {
-                        ResultSet keys = stmt.getGeneratedKeys();
-                        if (keys.next()) {
-                            return keys.getInt(1);
-                        }
-                    }
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            } else {
-                e.printStackTrace();
-            }
+            e.printStackTrace();
         }
         return -1;
     }
@@ -2265,7 +2242,8 @@ public class DatabaseQuery {
     }
 
 
-    // Get user by TC number
+    // Get user by TC number - REMOVED as per requirement
+    /*
     public static User getUserByTcNo(String tcNo) {
         String query = "SELECT u.*, r.name as role_name FROM User u LEFT JOIN Role r ON u.role_id = r.role_id WHERE u.tc_no = ?";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -2288,6 +2266,7 @@ public class DatabaseQuery {
         }
         return null;
     }
+    */
 
     // Search patients by name (partial match)
     public static List<Patient> searchPatientsByName(String namePattern) {
