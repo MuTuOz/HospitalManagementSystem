@@ -64,31 +64,22 @@ public class ManagerCreateAppointmentController {
     private void searchPatient() {
         String searchTerm = patientSearchField.getText().trim();
         if (searchTerm.isEmpty()) {
-            NotificationUtil.showError("Hata", "Lütfen TC No veya hasta adı girin.");
+            NotificationUtil.showError("Hata", "Lütfen hasta adı girin.");
             return;
         }
 
-        // Search by TC or name
+        // Search by name
         Patient patient = null;
+        List<Patient> patients = DatabaseQuery.searchPatientsByName(searchTerm);
         
-        // Try TC first
-        User userByTc = DatabaseQuery.getUserByTcNo(searchTerm);
-        if (userByTc != null) {
-            patient = DatabaseQuery.getPatientByUserId(userByTc.getUserId());
-        }
-        
-        // If not found, try by name
-        if (patient == null) {
-            List<Patient> patients = DatabaseQuery.searchPatientsByName(searchTerm);
-            if (patients.isEmpty()) {
-                NotificationUtil.showError("Bulunamadı", "Bu TC veya isme sahip hasta bulunamadı.");
-                return;
-            } else if (patients.size() == 1) {
-                patient = patients.get(0);
-            } else {
-                // Multiple patients found, show selection dialog
-                patient = showPatientSelectionDialog(patients);
-            }
+        if (patients.isEmpty()) {
+            NotificationUtil.showError("Bulunamadı", "Bu isme sahip hasta bulunamadı.");
+            return;
+        } else if (patients.size() == 1) {
+            patient = patients.get(0);
+        } else {
+            // Multiple patients found, show selection dialog
+            patient = showPatientSelectionDialog(patients);
         }
 
         if (patient != null) {
@@ -327,8 +318,8 @@ public class ManagerCreateAppointmentController {
 
         String notes = notesArea.getText();
         boolean success = appointmentManager.createAppointment(
-            selectedDoctorId, 
             selectedPatientId, 
+            selectedDoctorId, 
             selectedSlot.getAvailabilityId(), 
             selectedHospitalId, 
             notes
