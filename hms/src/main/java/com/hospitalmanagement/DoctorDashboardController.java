@@ -439,7 +439,7 @@ public class DoctorDashboardController {
             
             // Patient search field
             javafx.scene.control.TextField patientSearchField = new javafx.scene.control.TextField();
-            patientSearchField.setPromptText("TC No veya hasta adını girin...");
+            patientSearchField.setPromptText("Hasta adını girin...");
             grid.add(new javafx.scene.control.Label("Hasta:"), 0, 0);
             grid.add(patientSearchField, 1, 0);
             
@@ -477,39 +477,33 @@ public class DoctorDashboardController {
             searchButton.setOnAction(e -> {
                 String searchTerm = patientSearchField.getText().trim();
                 if (searchTerm.isEmpty()) {
-                    NotificationUtil.showError("Hata", "Lütfen TC No veya hasta adı girin.");
+                    NotificationUtil.showError("Hata", "Lütfen hasta adı girin.");
                     return;
                 }
                 
                 // Search patient
                 Patient patient = null;
-                User userByTc = DatabaseQuery.getUserByTcNo(searchTerm);
-                if (userByTc != null) {
-                    patient = DatabaseQuery.getPatientByUserId(userByTc.getUserId());
-                }
                 
-                if (patient == null) {
-                    java.util.List<Patient> patients = DatabaseQuery.searchPatientsByName(searchTerm);
-                    if (patients.isEmpty()) {
-                        NotificationUtil.showError("Bulunamadı", "Bu TC veya isme sahip hasta bulunamadı.");
-                        return;
-                    } else if (patients.size() == 1) {
-                        patient = patients.get(0);
+                java.util.List<Patient> patients = DatabaseQuery.searchPatientsByName(searchTerm);
+                if (patients.isEmpty()) {
+                    NotificationUtil.showError("Bulunamadı", "Bu isme sahip hasta bulunamadı.");
+                    return;
+                } else if (patients.size() == 1) {
+                    patient = patients.get(0);
+                } else {
+                    // Show selection dialog for multiple results
+                    var patientOptions = patients.stream().map(p -> p.getName() + " (" + p.getEmail() + ")").collect(java.util.stream.Collectors.toList());
+                    var selectionDialog = new javafx.scene.control.ChoiceDialog<>(patientOptions.get(0), patientOptions);
+                    selectionDialog.setTitle("Hasta Seçim");
+                    selectionDialog.setHeaderText("Birden fazla hasta bulundu");
+                    selectionDialog.setContentText("Hastayı seçin:");
+                    
+                    var result = selectionDialog.showAndWait();
+                    if (result.isPresent()) {
+                        int selectedIndex = patientOptions.indexOf(result.get());
+                        patient = patients.get(selectedIndex);
                     } else {
-                        // Show selection dialog for multiple results
-                        var patientOptions = patients.stream().map(p -> p.getName() + " (" + p.getEmail() + ")").collect(java.util.stream.Collectors.toList());
-                        var selectionDialog = new javafx.scene.control.ChoiceDialog<>(patientOptions.get(0), patientOptions);
-                        selectionDialog.setTitle("Hasta Seçim");
-                        selectionDialog.setHeaderText("Birden fazla hasta bulundu");
-                        selectionDialog.setContentText("Hastayı seçin:");
-                        
-                        var result = selectionDialog.showAndWait();
-                        if (result.isPresent()) {
-                            int selectedIndex = patientOptions.indexOf(result.get());
-                            patient = patients.get(selectedIndex);
-                        } else {
-                            return;
-                        }
+                        return;
                     }
                 }
                 
@@ -961,18 +955,17 @@ public class DoctorDashboardController {
             DatabaseQuery.updateAppointmentDetails(appointmentId, diagnosis, medications, notes);
 
             // Create medical record
-            int recordId = hospitalManager.createMedicalRecord(
+            boolean created = hospitalManager.assignRecord(
                 selectedAppt.getPatientId(), 
                 doctor.getDoctorId(), 
                 appointmentId,
                 doctor.getHospitalId(),
-                diagnosis,
                 testResults,
                 medications,
                 notes
             );
             
-            if (recordId > 0) {
+            if (created) {
                 NotificationUtil.showInfo("Başarı", "Tıbbi kayıt başarıyla oluşturuldu.");
             } else {
                 NotificationUtil.showError("Hata", "Tıbbi kayıt oluşturulamadı.");
