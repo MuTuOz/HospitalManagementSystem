@@ -10,130 +10,124 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="800.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospitalmanagement.AdminDashboardController">
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="850.0" prefWidth="1250.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospitalmanagement.AdminDashboardController" style="-fx-background-color: #f5f5f5;">
     <children>
-        <VBox prefHeight="800.0" prefWidth="1100.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <VBox prefHeight="850.0" prefWidth="1250.0" spacing="0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
             <children>
-                <VBox spacing="5.0" styleClass="header">
+                <!-- Header (logout top-right) -->
+                <HBox alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: linear-gradient(to right, #00b3a6, #00d4c8); -fx-padding:20;">
                     <children>
-                        <Label fx:id="welcomeLabel" text="Admin Dashboard" textFill="WHITE">
-                            <font>
-                                <Font name="System Bold" size="24.0" />
-                            </font>
-                        </Label>
-                        <Label fx:id="subtitleLabel" text="Sistem Yönetimi" textFill="#ecf0f1" />
+                        <VBox spacing="2.0">
+                            <children>
+                                <Label text="Admin Ekranı" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;" />
+                                <Label fx:id="adminNameLabel" style="-fx-font-size: 15px; -fx-text-fill: #f0f0f0;" />
+                            </children>
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button mnemonicParsing="false" onAction="#handleLogout" styleClass="btn-logout" text="🚪 Çıkış" />
                     </children>
-                </VBox>
-                <TabPane prefHeight="700.0" prefWidth="1100.0" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+                </HBox>
+                
+                <!-- Tabs -->
+                <TabPane prefHeight="720.0" prefWidth="1250.0" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS" style="-fx-font-size:14px; -fx-background-color:#f5f5f5;">
+                    <padding><Insets top="20" right="20" bottom="20" left="20" /></padding>
                     <tabs>
-                        <Tab text="Hastaneler">
+                        <Tab text="🏥 Hastaneler">
                             <content>
-                                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="600.0" prefWidth="1000.0">
+                                <VBox spacing="15" style="-fx-background-color:white; -fx-background-radius:12; -fx-padding:20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);">
                                     <children>
-                                        <VBox spacing="10.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0">
+                                        <HBox spacing="15" alignment="CENTER_LEFT">
                                             <children>
-                                                <HBox spacing="10.0">
-                                                    <children>
-                                                        <Label text="Hastane Listesi" style="-fx-font-size: 14; -fx-font-weight: bold;" />
-                                                        <Button mnemonicParsing="false" onAction="#loadHospitals" text="Yükle" style="-fx-padding: 5 15;" />
-                                                        <Button mnemonicParsing="false" onAction="#refreshHospitals" text="Yenile" style="-fx-padding: 5 15;" />
-                                                        <Button mnemonicParsing="false" onAction="#addHospital" text="Ekle" style="-fx-padding: 5 12;" />
-                                                        <Button mnemonicParsing="false" onAction="#editHospital" text="Düzenle" style="-fx-padding: 5 12;" />
-                                                        <Button mnemonicParsing="false" onAction="#deleteHospital" text="Sil" style="-fx-padding: 5 12;" />
-                                                    </children>
-                                                </HBox>
-                                                <TableView fx:id="hospitalTableView" prefHeight="500.0" VBox.vgrow="ALWAYS">
-                                                    <columns>
-                                                        <TableColumn prefWidth="80.0" text="ID" />
-                                                        <TableColumn prefWidth="200.0" text="Ad" />
-                                                        <TableColumn prefWidth="260.0" text="Adres" />
-                                                        <TableColumn prefWidth="120.0" text="Telefon" />
-                                                        <TableColumn prefWidth="120.0" text="Şehir" />
-                                                    </columns>
-                                                </TableView>
+                                                <Label text="🏥 Hastane Listesi" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill:#00b3a6;" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Button mnemonicParsing="false" onAction="#refreshHospitals" text="🔄 Yenile" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#addHospital" text="➕ Ekle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px; -fx-font-weight:bold;" styleClass="btn-primary" />
+                                                <Button mnemonicParsing="false" onAction="#editHospital" text="Düzenle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#deleteHospital" text="Sil" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
                                             </children>
-                                        </VBox>
+                                        </HBox>
+                                        <TableView fx:id="hospitalTableView" prefHeight="550.0" VBox.vgrow="ALWAYS" style="-fx-font-size:14px;">
+                                            <columns>
+                                                <TableColumn prefWidth="80.0" minWidth="80.0" text="ID" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="300.0" minWidth="200.0" text="Ad" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="350.0" minWidth="250.0" text="Adres" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="200.0" minWidth="150.0" text="Telefon" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="200.0" minWidth="150.0" text="Şehir" style="-fx-font-size:14px;" />
+                                            </columns>
+                                        </TableView>
                                     </children>
-                                </AnchorPane>
+                                </VBox>
                             </content>
                         </Tab>
-                        <Tab text="Kullanıcılar">
+                        <Tab text="👥 Kullanıcılar">
                             <content>
-                                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="600.0" prefWidth="1000.0">
+                                <VBox spacing="15" style="-fx-background-color:white; -fx-background-radius:12; -fx-padding:20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);">
                                     <children>
-                                        <VBox spacing="10.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0">
+                                        <HBox spacing="15" alignment="CENTER_LEFT">
                                             <children>
-                                                <HBox spacing="10.0">
-                                                    <children>
-                                                        <Label text="Kullanıcı Listesi" style="-fx-font-size: 14; -fx-font-weight: bold;" />
-                                                        <Button mnemonicParsing="false" onAction="#loadUsers" text="Yükle" style="-fx-padding: 5 15;" />
-                                                        <Button mnemonicParsing="false" onAction="#refreshUsers" text="Yenile" style="-fx-padding: 5 15;" />
-                                                        <Button mnemonicParsing="false" onAction="#addUser" text="Ekle" style="-fx-padding: 5 12;" />
-                                                        <Button mnemonicParsing="false" onAction="#editUser" text="Düzenle" style="-fx-padding: 5 12;" />
-                                                        <Button mnemonicParsing="false" onAction="#deleteUser" text="Sil" style="-fx-padding: 5 12;" />
-                                                    </children>
-                                                </HBox>
-                                                <TableView fx:id="usersTableView" prefHeight="500.0" VBox.vgrow="ALWAYS">
-                                                    <columns>
-                                                        <TableColumn prefWidth="80.0" text="ID" />
-                                                        <TableColumn prefWidth="200.0" text="Ad" />
-                                                        <TableColumn prefWidth="220.0" text="E-posta" />
-                                                        <TableColumn prefWidth="120.0" text="Rol" />
-                                                    </columns>
-                                                </TableView>
+                                                <Label text="👥 Kullanıcı Listesi" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill:#00b3a6;" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Button mnemonicParsing="false" onAction="#refreshUsers" text="🔄 Yenile" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#addUser" text="➕ Ekle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px; -fx-font-weight:bold;" styleClass="btn-primary" />
+                                                <Button mnemonicParsing="false" onAction="#editUser" text="Düzenle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#deleteUser" text="Sil" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
                                             </children>
-                                        </VBox>
+                                        </HBox>
+                                        <TableView fx:id="usersTableView" prefHeight="550.0" VBox.vgrow="ALWAYS" style="-fx-font-size:14px;">
+                                            <columns>
+                                                <TableColumn prefWidth="80.0" minWidth="80.0" text="ID" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="300.0" minWidth="200.0" text="Ad" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="300.0" minWidth="200.0" text="E-posta" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="250.0" minWidth="150.0" text="Rol" style="-fx-font-size:14px;" />
+                                            </columns>
+                                        </TableView>
                                     </children>
-                                </AnchorPane>
+                                </VBox>
                             </content>
                         </Tab>
-                        <Tab text="Doktorlar">
+                        <Tab text="👨‍⚕️ Doktorlar">
                             <content>
-                                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="600.0" prefWidth="1000.0">
+                                <VBox spacing="15" style="-fx-background-color:white; -fx-background-radius:12; -fx-padding:20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);">
                                     <children>
-                                        <VBox spacing="10.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0">
+                                        <HBox spacing="15" alignment="CENTER_LEFT">
                                             <children>
-                                                <HBox spacing="10.0">
-                                                    <children>
-                                                        <Label text="Doktor Listesi" style="-fx-font-size: 14; -fx-font-weight: bold;" />
-                                                        <Button mnemonicParsing="false" onAction="#loadDoctors" text="Yükle" style="-fx-padding: 5 15;" />
-                                                        <Button mnemonicParsing="false" onAction="#refreshDoctors" text="Yenile" style="-fx-padding: 5 15;" />
-                                                    </children>
-                                                </HBox>
-                                                <TableView fx:id="doctorsTableView" prefHeight="500.0" VBox.vgrow="ALWAYS">
-                                                    <columns>
-                                                        <TableColumn prefWidth="80.0" text="ID" />
-                                                        <TableColumn prefWidth="200.0" text="Ad" />
-                                                        <TableColumn prefWidth="200.0" text="Uzmanlık" />
-                                                    </columns>
-                                                </TableView>
+                                                <Label text="👨‍⚕️ Doktor Listesi" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill:#00b3a6;" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Button mnemonicParsing="false" onAction="#refreshDoctors" text="🔄 Yenile" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#addDoctor" text="➕ Ekle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px; -fx-font-weight:bold;" styleClass="btn-primary" />
+                                                <Button mnemonicParsing="false" onAction="#editDoctor" text="Düzenle" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#deleteDoctor" text="Sil" prefHeight="45" prefWidth="130" style="-fx-font-size:14px;" styleClass="btn-secondary" />
                                             </children>
-                                        </VBox>
+                                        </HBox>
+                                        <TableView fx:id="doctorsTableView" prefHeight="550.0" VBox.vgrow="ALWAYS" style="-fx-font-size:14px;">
+                                            <columns>
+                                                <TableColumn prefWidth="80.0" minWidth="80.0" text="ID" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="400.0" minWidth="250.0" text="Ad" style="-fx-font-size:14px;" />
+                                                <TableColumn prefWidth="450.0" minWidth="250.0" text="Uzmanlık" style="-fx-font-size:14px;" />
+                                            </columns>
+                                        </TableView>
                                     </children>
-                                </AnchorPane>
+                                </VBox>
                             </content>
                         </Tab>
-                        <Tab text="Raporlar">
+                        <Tab text="📊 Raporlar">
                             <content>
-                                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="600.0" prefWidth="1000.0">
+                                <VBox spacing="15" style="-fx-background-color:white; -fx-background-radius:12; -fx-padding:20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);">
                                     <children>
-                                        <VBox spacing="10.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0">
+                                        <Label text="📊 Sistem Raporları" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill:#00b3a6;" />
+                                        <HBox spacing="12">
                                             <children>
-                                                <Label text="Sistem Raporları" style="-fx-font-size: 14; -fx-font-weight: bold;" />
-                                                <HBox spacing="10.0">
-                                                    <children>
-                                                        <Button mnemonicParsing="false" onAction="#generateReports" text="Raporları Oluştur" style="-fx-padding: 10 20;" />
-                                                        <Button mnemonicParsing="false" onAction="#exportReportsCSV" text="CSV Olarak Dışa Aktar" style="-fx-padding: 10 20;" />
-                                                        <Button mnemonicParsing="false" onAction="#handleRestoreBackup" text="Yedeği Geri Yükle" style="-fx-padding: 10 20;" />
-                                                    </children>
-                                                </HBox>
-                                                <Label fx:id="reportLabel" text="" style="-fx-font-size: 12; -fx-padding: 20;" wrapText="true" />
+                                                <Button mnemonicParsing="false" onAction="#generateReports" text="Raporları Oluştur" prefHeight="32" prefWidth="150" style="-fx-font-size:12px;" styleClass="btn-primary" />
+                                                <Button mnemonicParsing="false" onAction="#exportReportsCSV" text="CSV Olarak Dışa Aktar" prefHeight="32" prefWidth="180" style="-fx-font-size:12px;" styleClass="btn-secondary" />
+                                                <Button mnemonicParsing="false" onAction="#handleRestoreBackup" text="Yedeği Geri Yükle" prefHeight="32" prefWidth="160" style="-fx-font-size:12px;" styleClass="btn-secondary" />
                                             </children>
-                                        </VBox>
+                                        </HBox>
+                                        <Label fx:id="reportLabel" text="" style="-fx-font-size: 14px; -fx-padding: 20;" wrapText="true" />
                                     </children>
-                                </AnchorPane>
+                                </VBox>
                             </content>
                         </Tab>
                     </tabs>
@@ -141,7 +135,6 @@
                 <VBox spacing="5.0" style="-fx-padding: 10;">
                     <children>
                         <Button mnemonicParsing="false" onAction="#handleChangePassword" styleClass="btn-secondary" text="Şifre Değiştir" />
-                        <Button mnemonicParsing="false" onAction="#handleLogout" styleClass="btn-primary" text="Çıkış Yap" />
                     </children>
                 </VBox>
             </children>
